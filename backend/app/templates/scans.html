@@ -5,7 +5,7 @@
   <h1 class="text-2xl font-bold">Scan Jobs</h1>
   <a href="{{ url('/scans/new') }}" class="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium">New Scan</a>
 </div>
-<div class="rounded-xl border border-slate-800 overflow-hidden">
+<div class="rounded-xl border border-slate-800 overflow-hidden" data-tour="scans-list">
   <table class="w-full text-sm">
     <thead class="bg-slate-900 text-slate-400">
       <tr>
@@ -14,6 +14,9 @@
         <th class="text-left p-3">Targets</th>
         <th class="text-left p-3">Status</th>
         <th class="text-left p-3">Created</th>
+        {% if current_user and current_user.can_scan() %}
+        <th class="text-left p-3">Actions</th>
+        {% endif %}
       </tr>
     </thead>
     <tbody>
@@ -31,13 +34,27 @@
           <span class="px-2 py-0.5 rounded text-xs
             {% if job.status == 'completed' %}bg-emerald-900 text-emerald-300
             {% elif job.status == 'failed' %}bg-red-900 text-red-300
+            {% elif job.status == 'cancelled' %}bg-slate-700 text-slate-300
             {% elif job.status == 'running' %}bg-amber-900 text-amber-300
             {% else %}bg-slate-800 text-slate-300{% endif %}">{{ job.status }}</span>
         </td>
         <td class="p-3 text-slate-400">{{ job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '—' }}</td>
+        {% if current_user and current_user.can_scan() %}
+        <td class="p-3">
+          {% if job.status in ['completed', 'failed', 'cancelled'] %}
+          <form method="post" action="{{ url('/scans/' ~ job.id ~ '/rescan') }}" class="inline">
+            <button type="submit" class="text-xs rounded border border-emerald-700 text-emerald-300 hover:bg-emerald-950/40 px-2 py-1">
+              Rescan
+            </button>
+          </form>
+          {% else %}
+          <span class="text-slate-600 text-xs">—</span>
+          {% endif %}
+        </td>
+        {% endif %}
       </tr>
       {% else %}
-      <tr><td colspan="5" class="p-6 text-center text-slate-500">No scans yet.</td></tr>
+      <tr><td colspan="{{ 6 if current_user and current_user.can_scan() else 5 }}" class="p-6 text-center text-slate-500">No scans yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>

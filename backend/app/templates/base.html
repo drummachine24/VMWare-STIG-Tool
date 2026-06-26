@@ -8,25 +8,27 @@
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script>window.APP_BASE = {{ root_path|tojson }};</script>
   <script src="{{ url('/static/app.js') }}"></script>
+  <link rel="stylesheet" href="{{ url('/static/tour-guide.css') }}?v={{ tour_static_version }}">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
   <nav class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-6 flex-wrap">
-      <a href="{{ url('/') }}" class="font-semibold text-emerald-400">VMware STIG Tool</a>
+      <a href="{{ url('/') }}" class="font-semibold text-emerald-400" data-tour="welcome">VMware STIG Tool</a>
       {% if current_user and current_user.can_view() %}
       <a href="{{ url('/') }}" class="text-slate-300 hover:text-white text-sm">Dashboard</a>
-      <a href="{{ url('/scans') }}" class="text-slate-300 hover:text-white text-sm">Scans</a>
+      <a href="{{ url('/scans') }}" class="text-slate-300 hover:text-white text-sm" data-tour="nav-scans">Scans</a>
       {% endif %}
       {% if current_user and current_user.can_scan() %}
-      <a href="{{ url('/scans/new') }}" class="text-slate-300 hover:text-white text-sm">New Scan</a>
+      <a href="{{ url('/scans/new') }}" class="text-slate-300 hover:text-white text-sm" data-tour="nav-new-scan">New Scan</a>
       {% endif %}
       {% if current_user and current_user.can_admin() %}
-      <a href="{{ url('/vcenters') }}" class="text-slate-300 hover:text-white text-sm">vCenters</a>
+      <a href="{{ url('/vcenters') }}" class="text-slate-300 hover:text-white text-sm" data-tour="nav-vcenters">vCenters</a>
       <a href="{{ url('/schedules') }}" class="text-slate-300 hover:text-white text-sm">Schedules</a>
       <a href="{{ url('/admin') }}" class="text-slate-300 hover:text-white text-sm">Admin</a>
       {% endif %}
       <div class="ml-auto flex items-center gap-4 text-sm">
         {% if current_user %}
+        <button type="button" id="tour-start-btn" class="tour-start-btn">Take a tour</button>
         <span class="text-slate-500 hidden sm:inline">{{ current_user.display_name }} · {{ current_user.role_label }}</span>
         {% if oidc_enabled %}
         <a href="{{ url('/auth/logout') }}" class="text-slate-400 hover:text-white">Logout</a>
@@ -41,6 +43,17 @@
   <main class="max-w-6xl mx-auto px-4 py-8">
     {% block content %}{% endblock %}
   </main>
+  {% if current_user and current_user.can_view() %}
+  <script>
+    window.VMSTIG_TOUR = {
+      canAdmin: {{ 'true' if current_user.can_admin() else 'false' }},
+      canScan: {{ 'true' if current_user.can_scan() else 'false' }},
+      canRemediate: {{ 'true' if current_user.can_remediate() else 'false' }},
+      assetVersions: {{ tour_asset_versions|tojson }},
+    };
+  </script>
+  <script src="{{ url('/static/tour-guide.js') }}?v={{ tour_static_version }}"></script>
+  {% endif %}
   {% block scripts %}{% endblock %}
 </body>
 </html>

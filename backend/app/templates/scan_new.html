@@ -8,7 +8,7 @@
   Add a <a href="{{ url('/vcenters') }}" class="underline">vCenter connection</a> before running scans.
 </div>
 {% else %}
-<form method="post" action="{{ url('/scans') }}" id="scan-form" class="max-w-3xl space-y-6">
+<form method="post" action="{{ url('/scans') }}" id="scan-form" class="max-w-3xl space-y-6" data-tour="scan-form">
   <input type="hidden" name="selected_targets_json" id="selected-targets-json" value="">
   <div>
     <label class="block text-sm text-slate-400 mb-1">Scan Name</label>
@@ -23,7 +23,7 @@
     </select>
   </div>
 
-  <fieldset class="rounded-xl border border-slate-800 p-5 space-y-3">
+  <fieldset class="rounded-xl border border-slate-800 p-5 space-y-3" data-tour="scan-inventory">
     <legend class="px-2 font-semibold">Environment Inventory</legend>
     <p id="inventory-status" class="text-sm text-slate-400 mb-3">Select a vCenter to load hosts and VMs.</p>
     <div class="flex gap-2 mb-3">

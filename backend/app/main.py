@@ -22,6 +22,7 @@ from app.services.app_secret import ensure_app_secret_key, resolve_app_secret_ke
 from app.services.credential_key import sync_credential_key_file_from_env
 from app.services.crypto import encrypt_secret
 from app.services.preflight import run_preflight
+from app.services.scan_rescan import rescan_job
 from app.tasks.celery_app import run_scan_job
 from app.web import render, url_for_path
 
@@ -59,8 +60,15 @@ async def serve_static(asset_path: str):
     if not candidate.is_file():
         _static_logger.warning("Static asset missing or unreadable: %s", candidate)
         raise HTTPException(status_code=404, detail="Not found")
-    media_type = "application/javascript" if candidate.suffix == ".js" else None
-    return FileResponse(candidate, media_type=media_type)
+    media_type = None
+    if candidate.suffix == ".js":
+        media_type = "application/javascript"
+    elif candidate.suffix == ".css":
+        media_type = "text/css"
+    elif candidate.suffix == ".png":
+        media_type = "image/png"
+    headers = {"Cache-Control": "no-cache, must-revalidate"}
+    return FileResponse(candidate, media_type=media_type, headers=headers)
 
 app.add_middleware(AuthMiddleware)
 app.add_middleware(RootPathStripMiddleware)
@@ -222,6 +230,22 @@ def create_scan_form(
     task = run_scan_job.delay(job.id)
     job.celery_task_id = task.id
     db.commit()
+    return _redirect(f"/scans/{job.id}")
+
+
+@app.post("/scans/{job_id}/rescan")
+def rescan_scan_form(
+    job_id: int,
+    db: Session = Depends(get_db),
+    _user=Depends(require_scanner),
+):
+    source = db.get(ScanJob, job_id)
+    if not source:
+        return _redirect("/scans")
+    try:
+        job = rescan_job(db, source)
+    except ValueError:
+        return _redirect(f"/scans/{job_id}")
     return _redirect(f"/scans/{job.id}")
 
 

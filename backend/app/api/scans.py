@@ -24,6 +24,7 @@ from app.services.finding_peers import list_remediation_peers
 from app.services.remediation_jobs import create_remediation_job, get_remediation_job
 from app.services.scan_progress import mark_cancelled, parse_selected_targets
 from app.services.checklist_service import build_checklist_payload, ensure_result_counts
+from app.services.scan_rescan import rescan_job
 from app.services.stig_catalog import build_stig_preview, get_stig_scan_catalog
 from app.tasks.celery_app import celery_app, run_scan_job
 
@@ -152,6 +153,17 @@ def cancel_scan(job_id: int, db: Session = Depends(get_db), _user=Depends(requir
         celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
     job = db.get(ScanJob, job_id)
     return {"id": job_id, "status": job.status if job else ScanStatus.CANCELLED.value}
+
+
+@router.post("/{job_id}/rescan", response_model=ScanJobResponse, status_code=201)
+def rescan_scan(job_id: int, db: Session = Depends(get_db), _user=Depends(require_scanner)):
+    source = db.get(ScanJob, job_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Scan job not found")
+    try:
+        return rescan_job(db, source)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/{job_id}/results/{result_id}/checklist")
