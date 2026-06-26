@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}{{ job.name }} — Scan Detail{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <a href="{{ url('/scans') }}" class="text-slate-400 hover:text-white text-sm">← All scans</a>
+  <div class="flex flex-wrap items-start justify-between gap-4 mt-2">
+    <div>
+      <h1 class="text-2xl font-bold">{{ job.name }}</h1>
+      <p class="text-slate-400">{{ job.vcenter.name if job.vcenter else '' }} ·
+        <span id="scan-status-badge" class="px-2 py-0.5 rounded text-xs
+          {% if job.status == 'completed' %}bg-emerald-900 text-emerald-300
+          {% elif job.status == 'failed' %}bg-red-900 text-red-300
+          {% elif job.status == 'cancelled' %}bg-slate-700 text-slate-300
+          {% elif job.status == 'running' %}bg-amber-900 text-amber-300
+          {% else %}bg-slate-800 text-slate-300{% endif %}">{{ job.status }}</span>
+      </p>
+    </div>
+    {% if job.status in ['pending', 'running'] %}
+    <button id="scan-cancel-btn" type="button" class="rounded-lg border border-red-800 text-red-300 hover:bg-red-950/50 px-4 py-2 text-sm">
+      Cancel scan
+    </button>
+    {% endif %}
+  </div>
+  <div id="scan-error-message" class="mt-3 rounded-lg border border-red-800 bg-red-950/40 p-3 text-red-200 text-sm whitespace-pre-wrap {% if not job.error_message %}hidden{% endif %}">{{ job.error_message or '' }}</div>
+</div>
+
+{% if job.status in ['pending', 'running'] %}
+<div id="scan-progress-panel" class="rounded-xl border border-amber-800 bg-amber-950/30 p-5 mb-6">
+  <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+    <div id="scan-progress-message" class="text-amber-100 text-sm font-medium">{{ job.progress_message or 'Scan starting...' }}</div>
+    <div id="scan-progress-label" class="text-xs text-amber-300/80">
+      {% if job.progress_total %}Step {{ job.progress_current }} of {{ job.progress_total }}{% endif %}
+    </div>
+  </div>
+  <div class="h-2 rounded-full bg-slate-800 overflow-hidden">
+    {% set pct = (job.progress_current * 100 // job.progress_total) if job.progress_total else (5 if job.status == 'running' else 0) %}
+    <div id="scan-progress-bar" class="h-full bg-amber-500 transition-all duration-500" style="width: {{ pct }}%"></div>
+  </div>
+</div>
+{% endif %}
+
+<h2 class="text-lg font-semibold mb-3">Results</h2>
+<div id="scan-results-list" class="space-y-4">
+  {% for r in job.results %}
+  <div class="rounded-xl border border-slate-800 bg-slate-900/40 p-4" data-result-id="{{ r.id }}">
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+      <div>
+        <div class="font-medium">{{ r.target_name }}</div>
+        <div class="text-xs text-slate-500 result-counts" data-result-id="{{ r.id }}">
+          {{ r.target_type }} · {{ r.status }} ·
+          {% if r.count_nf is not none %}
+          <span class="text-emerald-400">{{ r.count_nf or 0 }} NF</span> /
+          <span class="text-red-400">{{ r.count_open or 0 }} Open</span> /
+          <span class="text-amber-400">{{ r.count_nr or 0 }} NR</span> /
+          <span class="text-slate-400">{{ r.count_na or 0 }} NA</span>
+          {% else %}
+          {{ r.passed or 0 }} pass / {{ r.failed or 0 }} fail / {{ r.skipped or 0 }} skip
+          {% endif %}
+        </div>
+      </div>
+      <div class="space-x-2 text-sm">
+        <a href="{{ url('/scans/' ~ job.id ~ '/results/' ~ r.id) }}" class="text-violet-400 hover:underline">View checklist</a>
+        {% if r.json_path %}
+        <a href="{{ url('/api/scans/' ~ job.id ~ '/results/' ~ r.id ~ '/download/json') }}" class="text-sky-400 hover:underline">JSON</a>
+        {% endif %}
+        {% if r.ckl_path %}
+        <a href="{{ url('/api/scans/' ~ job.id ~ '/results/' ~ r.id ~ '/download/ckl') }}" class="text-emerald-400 hover:underline">CKL</a>
+        {% endif %}
+      </div>
+    </div>
+    {% if r.summary %}
+    <pre class="mt-2 text-xs text-slate-300 whitespace-pre-wrap overflow-x-auto rounded-lg bg-slate-950 border border-slate-800 p-3">{{ r.summary }}</pre>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="rounded-xl border border-slate-800 p-6 text-center text-slate-500">
+    {% if job.status in ['pending', 'running'] %}Waiting for first result...{% else %}No results yet.{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url('/static/scan-progress.js') }}"></script>
+<script>
+  initScanProgress({
+    jobId: {{ job.id }},
+    active: {{ 'true' if job.status in ['pending', 'running'] else 'false' }},
+  });
+  {% if job.status not in ['pending', 'running'] %}
+  (function () {
+    const jobId = {{ job.id }};
+    document.querySelectorAll(".result-counts").forEach(async (el) => {
+      const rid = el.dataset.resultId;
+      try {
+        const resp = await fetch(apiUrl(`/api/scans/${jobId}/results/${rid}/checklist`));
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const c = data.counts || {};
+        const parts = el.textContent.split("·").map((p) => p.trim());
+        const prefix = parts.slice(0, 2).join(" · ");
+        el.innerHTML = `${prefix} · <span class="text-emerald-400">${c.nf || 0} NF</span> / <span class="text-red-400">${c.open || 0} Open</span> / <span class="text-amber-400">${c.nr || 0} NR</span> / <span class="text-slate-400">${c.na || 0} NA</span>`;
+      } catch (_) {}
+    });
+  })();
+  {% endif %}
+</script>
+{% endblock %}

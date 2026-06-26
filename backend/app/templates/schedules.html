@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Schedules — VMware STIG Tool{% endblock %}
+
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-6">Scheduled Scans</h1>
+
+
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+  <div class="rounded-xl border border-slate-800 bg-slate-900 p-6">
+
+    <h2 class="font-semibold mb-4">Create Schedule</h2>
+
+    <form method="post" action="{{ url('/schedules') }}" class="space-y-4">
+
+      <div>
+
+        <label class="block text-sm text-slate-400 mb-1">Name</label>
+
+        <input name="name" required class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2">
+
+      </div>
+
+      <div>
+
+        <label class="block text-sm text-slate-400 mb-1">vCenter</label>
+
+        <select name="vcenter_id" required class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2">
+
+          {% for vc in vcenters %}
+
+          <option value="{{ vc.id }}">{{ vc.name }}</option>
+
+          {% endfor %}
+
+        </select>
+
+      </div>
+
+      <div>
+
+        <label class="block text-sm text-slate-400 mb-1">Cron Expression</label>
+
+        <input name="cron_expression" value="0 2 * * 0" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2">
+
+        <p class="text-xs text-slate-500 mt-1">Default: Sundays at 02:00 UTC (min hour dom month dow)</p>
+
+      </div>
+
+      <div>
+
+        <label class="block text-sm text-slate-400 mb-1">CKL export path (optional)</label>
+
+        <input
+
+          name="ckl_export_path"
+
+          placeholder="/data/ckl-exports"
+
+          class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 font-mono text-sm"
+
+        >
+
+        <p class="text-xs text-slate-500 mt-1">
+
+          Absolute path inside the worker container. After each scheduled scan completes, CKL files are copied to
+
+          <code class="text-slate-400">{path}/scan-{job_id}-{timestamp}/</code>.
+
+          Default: <code class="text-slate-400">/data/ckl-exports</code> (local folder).
+          For a <strong>Windows file share</strong>, mount SMB on the Linux host
+          (<code class="text-slate-400">scripts/mount-ckl-smb-share.sh</code>), bind-mount into the worker,
+          add the path to <code class="text-slate-400">CKL_EXPORT_ALLOWED_ROOTS</code>, then use e.g.
+          <code class="text-slate-400">/mnt/stig-ckl-export</code> here.
+
+        </p>
+
+      </div>
+
+      <fieldset class="space-y-2">
+
+        <label class="flex items-center gap-2"><input type="checkbox" name="scan_esxi" value="true" checked> ESXi</label>
+
+        <label class="flex items-center gap-2"><input type="checkbox" name="scan_vms" value="true" checked> VMs</label>
+
+        <label class="flex items-center gap-2"><input type="checkbox" name="scan_vcenter_product" value="true" checked> vCenter Product</label>
+
+        <label class="flex items-center gap-2"><input type="checkbox" name="scan_vcenter_appliance" value="true"> VCSA Appliance (SSH)</label>
+
+      </fieldset>
+
+      <button type="submit" class="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 font-medium">Create Schedule</button>
+
+    </form>
+
+  </div>
+
+
+
+  <div class="rounded-xl border border-slate-800 overflow-hidden">
+
+    <table class="w-full text-sm">
+
+      <thead class="bg-slate-900 text-slate-400">
+
+        <tr>
+
+          <th class="text-left p-3">Name</th>
+
+          <th class="text-left p-3">Cron</th>
+
+          <th class="text-left p-3">CKL Export</th>
+
+          <th class="text-left p-3">Enabled</th>
+
+          <th class="text-left p-3">Last Run</th>
+
+        </tr>
+
+      </thead>
+
+      <tbody>
+
+        {% for s in schedules %}
+
+        <tr class="border-t border-slate-800">
+
+          <td class="p-3">{{ s.name }}</td>
+
+          <td class="p-3 font-mono text-xs text-slate-400">{{ s.cron_expression }}</td>
+
+          <td class="p-3 font-mono text-xs text-slate-400">{{ s.ckl_export_path or '—' }}</td>
+
+          <td class="p-3">{{ 'Yes' if s.enabled else 'No' }}</td>
+
+          <td class="p-3 text-slate-400">{{ s.last_run_at.strftime('%Y-%m-%d %H:%M') if s.last_run_at else 'Never' }}</td>
+
+        </tr>
+
+        {% else %}
+
+        <tr><td colspan="5" class="p-6 text-center text-slate-500">No schedules configured.</td></tr>
+
+        {% endfor %}
+
+      </tbody>
+
+    </table>
+
+  </div>
+
+</div>
+
+{% endblock %}
+

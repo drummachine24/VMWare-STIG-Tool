@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}VMware STIG Scan Tool{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script>window.APP_BASE = {{ root_path|tojson }};</script>
+  <script src="{{ url('/static/app.js') }}"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <nav class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-6 flex-wrap">
+      <a href="{{ url('/') }}" class="font-semibold text-emerald-400">VMware STIG Tool</a>
+      {% if current_user and current_user.can_view() %}
+      <a href="{{ url('/') }}" class="text-slate-300 hover:text-white text-sm">Dashboard</a>
+      <a href="{{ url('/scans') }}" class="text-slate-300 hover:text-white text-sm">Scans</a>
+      {% endif %}
+      {% if current_user and current_user.can_scan() %}
+      <a href="{{ url('/scans/new') }}" class="text-slate-300 hover:text-white text-sm">New Scan</a>
+      {% endif %}
+      {% if current_user and current_user.can_admin() %}
+      <a href="{{ url('/vcenters') }}" class="text-slate-300 hover:text-white text-sm">vCenters</a>
+      <a href="{{ url('/schedules') }}" class="text-slate-300 hover:text-white text-sm">Schedules</a>
+      <a href="{{ url('/admin') }}" class="text-slate-300 hover:text-white text-sm">Admin</a>
+      {% endif %}
+      <div class="ml-auto flex items-center gap-4 text-sm">
+        {% if current_user %}
+        <span class="text-slate-500 hidden sm:inline">{{ current_user.display_name }} · {{ current_user.role_label }}</span>
+        {% if oidc_enabled %}
+        <a href="{{ url('/auth/logout') }}" class="text-slate-400 hover:text-white">Logout</a>
+        {% endif %}
+        {% elif oidc_enabled %}
+        <a href="{{ url('/auth/login') }}" class="text-emerald-400 hover:text-emerald-300">Login</a>
+        {% endif %}
+        <a href="{{ url('/docs') }}" class="text-slate-500 hover:text-slate-300">API</a>
+      </div>
+    </div>
+  </nav>
+  <main class="max-w-6xl mx-auto px-4 py-8">
+    {% block content %}{% endblock %}
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

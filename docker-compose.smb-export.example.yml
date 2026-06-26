@@ -1,0 +1,23 @@
+# Example: export scheduled-scan CKLs to a Windows file share.
+#
+# 1. On the Linux host, mount the share:
+#      sudo bash scripts/mount-ckl-smb-share.sh //fileserver.example.com/STIG-CKL /mnt/stig-ckl-export
+#
+# 2. Copy this file to docker-compose.override.yml (or merge into docker-compose.yml):
+#
+# 3. In .env add the mount to allowed roots:
+#      CKL_EXPORT_ALLOWED_ROOTS=/data/reports,/data/ckl-exports,/mnt/stig-ckl-export
+#
+# 4. In Schedules, set CKL export path to: /mnt/stig-ckl-export
+#
+# CKLs appear on Windows as:
+#   \\fileserver.example.com\STIG-CKL\scan-{job_id}-{timestamp}\*.ckl
+
+services:
+  web:
+    volumes:
+      - /mnt/stig-ckl-export:/mnt/stig-ckl-export
+
+  worker:
+    volumes:
+      - /mnt/stig-ckl-export:/mnt/stig-ckl-export

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Access denied — VMware STIG Tool{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto rounded-xl border border-amber-800/60 bg-amber-950/30 p-8">
+  <h1 class="text-xl font-bold text-amber-200 mb-3">No application roles assigned</h1>
+  <p class="text-slate-300 mb-4">
+    You signed in successfully, but your Keycloak account does not have any VMware STIG Tool roles yet.
+    Ask an administrator to assign one of these realm or client roles:
+  </p>
+  <ul class="list-disc list-inside text-sm text-slate-400 mb-6 space-y-1">
+    {% for role in keycloak_roles %}
+    <li><code class="text-amber-100">{{ role }}</code></li>
+    {% endfor %}
+  </ul>
+  <a href="{{ logout_url }}" class="inline-block rounded-lg bg-slate-800 hover:bg-slate-700 px-4 py-2 text-sm">Sign out</a>
+</div>
+{% endblock %}

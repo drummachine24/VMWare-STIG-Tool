@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Administration — VMware STIG Tool{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-2">Administration</h1>
+<p class="text-slate-400 text-sm mb-8">OIDC configuration, Keycloak role mapping, and deployment notes.</p>
+
+<div class="grid gap-6 lg:grid-cols-2">
+  <section class="rounded-xl border border-slate-800 bg-slate-900/50 p-6 space-y-4">
+    <h2 class="font-semibold text-emerald-300">Application secret key</h2>
+    <p class="text-sm text-slate-400">
+      Signs browser session cookies for OIDC login. Stored on disk when not set in environment variables.
+    </p>
+    <dl class="text-sm space-y-2">
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Status</dt>
+        <dd>
+          {% if app_secret.insecure %}
+          <span class="text-amber-300">Insecure default</span>
+          {% elif app_secret.env_locked %}
+          <span class="text-emerald-300">Set via environment</span>
+          {% else %}
+          <span class="text-emerald-300">Stored in app</span>
+          {% endif %}
+        </dd>
+      </div>
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Source</dt>
+        <dd class="font-mono text-xs">{{ app_secret.source }}</dd>
+      </div>
+      {% if app_secret.preview %}
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Key preview</dt>
+        <dd class="font-mono text-xs">{{ app_secret.preview }}</dd>
+      </div>
+      {% endif %}
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Storage path</dt>
+        <dd class="font-mono text-xs break-all text-right">{{ app_secret.file_path }}</dd>
+      </div>
+    </dl>
+
+    {% if flash_app_secret %}
+    <div class="rounded-lg border border-emerald-800 bg-emerald-950/40 p-4 space-y-2">
+      <p class="text-sm text-emerald-200 font-medium">New secret key generated</p>
+      <p class="text-xs text-slate-400">Copy this now. It will not be shown again.</p>
+      <code class="block text-xs break-all rounded bg-slate-950 border border-slate-800 p-3 text-emerald-100">{{ flash_app_secret }}</code>
+      <p class="text-xs text-amber-200/90">
+        Restart the web container to apply: <code class="text-amber-100">docker compose restart web</code>
+      </p>
+    </div>
+    {% endif %}
+
+    {% if app_secret.env_locked %}
+    <p class="text-xs text-slate-500">
+      <code>APP_SECRET_KEY</code> is set in docker-compose or <code>.env</code>. Remove it there to manage the key from this page instead.
+    </p>
+    {% else %}
+    <div class="flex flex-wrap gap-3">
+      {% if not app_secret.file_exists or app_secret.insecure %}
+      <form method="post" action="{{ url('/admin/app-secret/generate') }}">
+        <button type="submit" class="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium">
+          Generate secret key
+        </button>
+      </form>
+      {% else %}
+      <form method="post" action="{{ url('/admin/app-secret/generate') }}"
+            onsubmit="return confirm('Regenerate the secret key? All users will be logged out after you restart the web container.');">
+        <input type="hidden" name="regenerate" value="true">
+        <button type="submit" class="rounded-lg border border-amber-700 text-amber-200 hover:bg-amber-950/50 px-4 py-2 text-sm">
+          Regenerate secret key
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    <p class="text-xs text-slate-500">
+      On first startup the app also auto-generates a key if none exists. Restart the web container after generating or regenerating.
+    </p>
+    {% endif %}
+  </section>
+
+  <section class="rounded-xl border border-slate-800 bg-slate-900/50 p-6 space-y-4">
+    <h2 class="font-semibold text-emerald-300">Credential encryption key</h2>
+    <p class="text-sm text-slate-400">
+      Encrypts vCenter passwords in the database. The web and scan worker containers must use the same key.
+    </p>
+    <dl class="text-sm space-y-2">
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Status</dt>
+        <dd>
+          {% if credential_key.insecure %}
+          <span class="text-amber-300">Insecure default</span>
+          {% elif credential_key.env_locked %}
+          <span class="text-emerald-300">Set via environment</span>
+          {% else %}
+          <span class="text-emerald-300">Stored in app</span>
+          {% endif %}
+        </dd>
+      </div>
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Source</dt>
+        <dd class="font-mono text-xs">{{ credential_key.source }}</dd>
+      </div>
+      {% if credential_key.preview %}
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Key preview</dt>
+        <dd class="font-mono text-xs">{{ credential_key.preview }}</dd>
+      </div>
+      {% endif %}
+      <div class="flex justify-between gap-4">
+        <dt class="text-slate-500">Storage path</dt>
+        <dd class="font-mono text-xs break-all text-right">{{ credential_key.file_path }}</dd>
+      </div>
+    </dl>
+    <p class="text-xs text-slate-500">
+      Set <code>CREDENTIAL_ENCRYPTION_KEY</code> in <code>.env</code> / docker-compose for all services
+      (web, worker, scheduler). If inventory fails with “Unable to decrypt stored credential”, re-save the
+      vCenter password after the keys match.
+    </p>
+  </section>
+
+  <section class="rounded-xl border border-slate-800 bg-slate-900/50 p-6 space-y-4">
+    <h2 class="font-semibold text-emerald-300">Current OIDC settings</h2>
+    <dl class="text-sm space-y-2">
+      <div class="flex justify-between gap-4"><dt class="text-slate-500">Enabled</dt><dd>{{ settings.oidc_enabled }}</dd></div>
+      <div class="flex justify-between gap-4"><dt class="text-slate-500">Issuer</dt><dd class="font-mono text-xs break-all text-right">{{ settings.oidc_issuer_url or '—' }}</dd></div>
+      <div class="flex justify-between gap-4"><dt class="text-slate-500">Client ID</dt><dd class="font-mono text-xs">{{ settings.oidc_client_id or '—' }}</dd></div>
+      <div class="flex justify-between gap-4"><dt class="text-slate-500">Redirect URI</dt><dd class="font-mono text-xs break-all text-right">{{ settings.oidc_redirect_uri or 'auto' }}</dd></div>
+      <div class="flex justify-between gap-4"><dt class="text-slate-500">Public URL</dt><dd class="font-mono text-xs break-all text-right">{{ settings.app_public_url or '—' }}</dd></div>
+      <div class="flex justify-between gap-4"><dt class="text-slate-500">Root path</dt><dd class="font-mono text-xs">{{ settings.app_root_path or '/' }}</dd></div>
+    </dl>
+    <p class="text-xs text-slate-500">
+      OIDC settings are loaded from environment variables (<code>.env</code> / docker-compose).
+      Restart the web container after changes.
+    </p>
+  </section>
+
+  <section class="rounded-xl border border-slate-800 bg-slate-900/50 p-6 space-y-4">
+    <h2 class="font-semibold text-emerald-300">Keycloak roles</h2>
+    <p class="text-sm text-slate-400">Create these roles in your Keycloak realm and assign them to users or groups:</p>
+    <table class="w-full text-sm">
+      <thead class="text-slate-500 text-left"><tr><th class="pb-2">Role</th><th class="pb-2">Access</th></tr></thead>
+      <tbody class="text-slate-300">
+        <tr class="border-t border-slate-800"><td class="py-2 font-mono text-xs">vmstig-viewer</td><td>View scans and checklists</td></tr>
+        <tr class="border-t border-slate-800"><td class="py-2 font-mono text-xs">vmstig-scanner</td><td>Viewer + create and run scans</td></tr>
+        <tr class="border-t border-slate-800"><td class="py-2 font-mono text-xs">vmstig-remediator</td><td>Scanner + run remediation</td></tr>
+        <tr class="border-t border-slate-800"><td class="py-2 font-mono text-xs">vmstig-admin</td><td>Full access including vCenters, schedules, this page</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="rounded-xl border border-slate-800 bg-slate-900/50 p-6 space-y-3 lg:col-span-2">
+    <h2 class="font-semibold text-emerald-300">Keycloak client checklist</h2>
+    <ol class="list-decimal list-inside text-sm text-slate-400 space-y-2">
+      <li>Create a realm (or use an existing one) for the VMware STIG Tool.</li>
+      <li>Create a confidential OpenID Connect client with standard flow enabled.</li>
+      <li>Valid redirect URI: <code class="text-slate-200">{{ callback_url }}</code></li>
+      <li>Valid post-logout redirect: <code class="text-slate-200">{{ post_logout_url }}</code></li>
+      <li>Add the four <code class="text-slate-200">vmstig-*</code> roles above and assign them to users/groups.</li>
+      <li>Ensure roles appear in the access token (realm roles or client roles for this client).</li>
+    </ol>
+  </section>
+</div>
+{% endblock %}

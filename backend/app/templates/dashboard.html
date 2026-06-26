@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — VMware STIG Tool{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+  <div class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+    <div class="text-slate-400 text-sm">vCenter Connections</div>
+    <div class="text-3xl font-bold text-emerald-400">{{ vcenter_count }}</div>
+  </div>
+  <div class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+    <div class="text-slate-400 text-sm">Active Schedules</div>
+    <div class="text-3xl font-bold text-sky-400">{{ schedule_count }}</div>
+  </div>
+  <div class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+    <a href="{{ url('/scans/new') }}" class="inline-block mt-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium">Run New Scan</a>
+  </div>
+</div>
+
+<h2 class="text-lg font-semibold mb-3">Recent Scans</h2>
+<div class="rounded-xl border border-slate-800 overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-900 text-slate-400">
+      <tr>
+        <th class="text-left p-3">Name</th>
+        <th class="text-left p-3">vCenter</th>
+        <th class="text-left p-3">Status</th>
+        <th class="text-left p-3">Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job in recent_jobs %}
+      <tr class="border-t border-slate-800 hover:bg-slate-900/50">
+        <td class="p-3"><a href="{{ url('/scans/' ~ job.id) }}" class="text-emerald-400 hover:underline">{{ job.name }}</a></td>
+        <td class="p-3">{{ job.vcenter.name if job.vcenter else '—' }}</td>
+        <td class="p-3">
+          <span class="px-2 py-0.5 rounded text-xs
+            {% if job.status == 'completed' %}bg-emerald-900 text-emerald-300
+            {% elif job.status == 'failed' %}bg-red-900 text-red-300
+            {% elif job.status == 'running' %}bg-amber-900 text-amber-300
+            {% else %}bg-slate-800 text-slate-300{% endif %}">
+            {{ job.status }}
+          </span>
+        </td>
+        <td class="p-3 text-slate-400">{{ job.created_at.strftime('%Y-%m-%d %H:%M UTC') if job.created_at else '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="p-6 text-center text-slate-500">No scans yet. <a href="{{ url('/scans/new') }}" class="text-emerald-400">Run your first scan</a>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

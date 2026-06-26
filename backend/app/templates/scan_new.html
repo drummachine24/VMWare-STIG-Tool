@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}New Scan — VMware STIG Tool{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">New STIG Scan</h1>
+
+{% if not vcenters %}
+<div class="rounded-xl border border-amber-800 bg-amber-950/30 p-6 text-amber-200">
+  Add a <a href="{{ url('/vcenters') }}" class="underline">vCenter connection</a> before running scans.
+</div>
+{% else %}
+<form method="post" action="{{ url('/scans') }}" id="scan-form" class="max-w-3xl space-y-6">
+  <input type="hidden" name="selected_targets_json" id="selected-targets-json" value="">
+  <div>
+    <label class="block text-sm text-slate-400 mb-1">Scan Name</label>
+    <input name="name" required placeholder="Production weekly audit" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2">
+  </div>
+  <div>
+    <label class="block text-sm text-slate-400 mb-1">vCenter</label>
+    <select name="vcenter_id" id="vcenter-select" required class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2">
+      {% for vc in vcenters %}
+      <option value="{{ vc.id }}">{{ vc.name }} ({{ vc.hostname }})</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <fieldset class="rounded-xl border border-slate-800 p-5 space-y-3">
+    <legend class="px-2 font-semibold">Environment Inventory</legend>
+    <p id="inventory-status" class="text-sm text-slate-400 mb-3">Select a vCenter to load hosts and VMs.</p>
+    <div class="flex gap-2 mb-3">
+      <button type="button" id="select-all-btn" class="text-xs rounded border border-slate-700 px-3 py-1 hover:bg-slate-800">Select all</button>
+      <button type="button" id="deselect-all-btn" class="text-xs rounded border border-slate-700 px-3 py-1 hover:bg-slate-800">Deselect all</button>
+    </div>
+    <div id="inventory-tree" class="rounded-lg border border-slate-800 bg-slate-950/50 p-4 max-h-96 overflow-y-auto"></div>
+  </fieldset>
+
+  <fieldset class="rounded-xl border border-slate-800 p-5 space-y-3">
+    <legend class="px-2 font-semibold">Scan Targets</legend>
+    <p class="text-xs text-slate-500 mb-2">Updated automatically from the inventory tree above. Uncheck everything there to use legacy scope options below.</p>
+    <label class="flex items-center gap-3">
+      <input type="checkbox" name="scan_esxi" value="true" checked class="rounded">
+      <span>ESXi Hosts <span class="text-slate-500 text-sm">— PowerCLI via vCenter</span></span>
+    </label>
+    <label class="flex items-center gap-3">
+      <input type="checkbox" name="scan_vms" value="true" checked class="rounded">
+      <span>Virtual Machines <span class="text-slate-500 text-sm">— PowerCLI via vCenter</span></span>
+    </label>
+    <label class="flex items-center gap-3">
+      <input type="checkbox" name="scan_vcenter_product" value="true" checked class="rounded">
+      <span>vCenter Product Controls <span class="text-slate-500 text-sm">— PowerCLI via vCenter API</span></span>
+    </label>
+    <label class="flex items-center gap-3">
+      <input type="checkbox" name="scan_vcenter_appliance" value="true" class="rounded">
+      <span>vCenter Appliance (VCSA) <span class="text-slate-500 text-sm">— SSH to appliance OS</span></span>
+    </label>
+  </fieldset>
+
+  <fieldset class="rounded-xl border border-slate-800 p-5 space-y-3">
+    <legend class="px-2 font-semibold">ESXi Scope (fallback)</legend>
+    <p class="text-xs text-slate-500">Used only when no individual hosts are selected in the tree.</p>
+    <select name="esxi_scope" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2">
+      <option value="all_hosts">All hosts in vCenter</option>
+      <option value="cluster">Cluster</option>
+      <option value="single">Single host</option>
+    </select>
+    <input name="esxi_cluster" placeholder="Cluster name (if cluster scope)" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2">
+    <input name="esxi_host" placeholder="Host FQDN (if single host)" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2">
+  </fieldset>
+
+  <fieldset class="rounded-xl border border-slate-800 p-5 space-y-4" id="stig-preview-panel">
+    <legend class="px-2 font-semibold">STIG profiles that will run</legend>
+    <p id="stig-preview-summary" class="text-sm text-slate-400">Select targets above to preview audit steps and STIG Readiness Guides.</p>
+    <div id="stig-preview-steps" class="space-y-2"></div>
+    <div id="stig-preview-guides-wrap" class="hidden">
+      <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-2">Checklists in STIG Viewer</h3>
+      <ul id="stig-preview-guides" class="space-y-1 text-sm"></ul>
+    </div>
+    <p class="text-xs text-slate-500 leading-relaxed">
+      VCF 9.x uses Broadcom STIG Readiness Guides (SRGs). Each audit step produces a separate result and CKL download.
+      VCSA appliance scans (SSH) include VAMI, PostgreSQL, Envoy, and Photon OS guides in one audit pass.
+    </p>
+  </fieldset>
+
+  <button type="submit" class="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-6 py-2 font-medium">Start Scan</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url('/static/inventory-tree.js') }}"></script>
+<script>
+  initInventoryTree({
+    formId: "scan-form",
+    vcenterSelectId: "vcenter-select",
+    panelId: "inventory-tree",
+    statusId: "inventory-status",
+    hiddenInputId: "selected-targets-json",
+    selectAllId: "select-all-btn",
+    deselectAllId: "deselect-all-btn",
+    previewSummaryId: "stig-preview-summary",
+    previewStepsId: "stig-preview-steps",
+    previewGuidesId: "stig-preview-guides",
+    previewGuidesWrapId: "stig-preview-guides-wrap",
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Pre-flight — {{ vcenter.name }}{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-2">Pre-flight Checks</h1>
+<p class="text-slate-400 mb-6">{{ vcenter.name }} ({{ vcenter.hostname }})</p>
+
+<div class="space-y-3 max-w-2xl">
+  <div class="rounded-lg border border-slate-800 p-4 flex justify-between items-center">
+    <div>
+      <div class="font-medium">vCenter API (443 / PowerCLI)</div>
+      <div class="text-sm text-slate-400">{{ checks.vcenter_api_message }}</div>
+    </div>
+    <span class="px-2 py-1 rounded text-xs {{ 'bg-emerald-900 text-emerald-300' if checks.vcenter_api else 'bg-red-900 text-red-300' }}">
+      {{ 'PASS' if checks.vcenter_api else 'FAIL' }}
+    </span>
+  </div>
+
+  <div class="rounded-lg border border-slate-800 p-4 flex justify-between items-center">
+    <div>
+      <div class="font-medium">SSH (22) — Appliance Scan</div>
+      <div class="text-sm text-slate-400">{{ checks.ssh_message or 'Not checked' }}</div>
+    </div>
+    <span class="px-2 py-1 rounded text-xs
+      {% if checks.ssh_reachable %}bg-emerald-900 text-emerald-300
+      {% elif checks.ssh_reachable is none %}bg-slate-800 text-slate-400
+      {% else %}bg-amber-900 text-amber-300{% endif %}">
+      {{ 'PASS' if checks.ssh_reachable else ('N/A' if checks.ssh_reachable is none else 'FAIL') }}
+    </span>
+  </div>
+
+  <div class="rounded-lg border border-slate-800 p-4 flex justify-between items-center">
+    <div>
+      <div class="font-medium">STIG Profiles</div>
+      <div class="text-sm text-slate-400">{{ checks.profiles_message }}</div>
+    </div>
+    <span class="px-2 py-1 rounded text-xs {{ 'bg-emerald-900 text-emerald-300' if checks.profiles_present else 'bg-red-900 text-red-300' }}">
+      {{ 'PASS' if checks.profiles_present else 'FAIL' }}
+    </span>
+  </div>
+
+  <div class="rounded-lg border border-slate-800 p-4 flex justify-between items-center">
+    <div>
+      <div class="font-medium">Scan Worker</div>
+      <div class="text-sm text-slate-400">
+        {% if checks.worker_reachable %}Celery worker responded{% else %}Worker did not respond — check: docker compose ps worker{% endif %}
+      </div>
+    </div>
+    <span class="px-2 py-1 rounded text-xs {{ 'bg-emerald-900 text-emerald-300' if checks.worker_reachable else 'bg-red-900 text-red-300' }}">
+      {{ 'PASS' if checks.worker_reachable else 'FAIL' }}
+    </span>
+  </div>
+
+  <div class="rounded-lg border border-slate-800 p-4 flex justify-between items-center">
+    <div>
+      <div class="font-medium">CINC Auditor <span class="text-slate-500 font-normal text-sm">(scan worker)</span></div>
+      <div class="text-sm text-slate-400">{{ checks.cinc_auditor_message or 'Required for compliance scans' }}</div>
+    </div>
+    <span class="px-2 py-1 rounded text-xs {{ 'bg-emerald-900 text-emerald-300' if checks.cinc_auditor else 'bg-red-900 text-red-300' }}">
+      {{ 'PASS' if checks.cinc_auditor else 'FAIL' }}
+    </span>
+  </div>
+
+  <div class="rounded-lg border border-slate-800 p-4 flex justify-between items-center">
+    <div>
+      <div class="font-medium">SAF CLI <span class="text-slate-500 font-normal text-sm">(scan worker)</span></div>
+      <div class="text-sm text-slate-400">{{ checks.saf_cli_message or 'Required for CKL generation' }}</div>
+    </div>
+    <span class="px-2 py-1 rounded text-xs {{ 'bg-emerald-900 text-emerald-300' if checks.saf_cli else 'bg-red-900 text-red-300' }}">
+      {{ 'PASS' if checks.saf_cli else 'FAIL' }}
+    </span>
+  </div>
+
+  {% if checks.train_vmware is not none %}
+  <div class="rounded-lg border border-slate-800 p-4 flex justify-between items-center">
+    <div>
+      <div class="font-medium">PowerCLI Modules <span class="text-slate-500 font-normal text-sm">(scan worker)</span></div>
+      <div class="text-sm text-slate-400">{{ checks.powercli_message or 'Required for vCenter / ESXi / VM scans' }}</div>
+    </div>
+    <span class="px-2 py-1 rounded text-xs {{ 'bg-emerald-900 text-emerald-300' if checks.powercli else 'bg-red-900 text-red-300' }}">
+      {{ 'PASS' if checks.powercli else 'FAIL' }}
+    </span>
+  </div>
+
+  <div class="rounded-lg border border-slate-800 p-4 flex justify-between items-center">
+    <div>
+      <div class="font-medium">train-vmware Plugin <span class="text-slate-500 font-normal text-sm">(scan worker)</span></div>
+      <div class="text-sm text-slate-400">{{ checks.train_vmware_message or 'Required for PowerCLI scans' }}</div>
+    </div>
+    <span class="px-2 py-1 rounded text-xs {{ 'bg-emerald-900 text-emerald-300' if checks.train_vmware else 'bg-amber-900 text-amber-300' }}">
+      {{ 'PASS' if checks.train_vmware else 'FAIL' }}
+    </span>
+  </div>
+  {% endif %}
+</div>
+
+<p class="mt-6 text-sm text-slate-500">
+  For appliance scans: enable SSH on vCenter, set root shell to <code class="text-slate-300">/bin/bash</code>, then re-run pre-flight.
+</p>
+<a href="{{ url('/vcenters') }}" class="inline-block mt-4 text-emerald-400 hover:underline">← Back to vCenters</a>
+{% endblock %}

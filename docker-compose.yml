@@ -1,0 +1,135 @@
+networks:
+  Stigman:
+    external: true
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stig}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stig}
+      POSTGRES_DB: ${POSTGRES_DB:-stigtool}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stig} -d ${POSTGRES_DB:-stigtool}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - Stigman
+
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - Stigman
+
+
+  web:
+    container_name: vmstigtool-web
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8081"
+      - --reload
+      - --proxy-headers
+      - --forwarded-allow-ips=*
+    ports:
+      - "${WEB_HOST_PORT:-8081}:8081"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-stig}:${POSTGRES_PASSWORD:-stig}@postgres:5432/${POSTGRES_DB:-stigtool}
+      REDIS_URL: redis://redis:6379/0
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-change-me}
+      APP_SECRET_KEY_FILE: ${APP_SECRET_KEY_FILE:-/data/secrets/app_secret_key}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-change-me-use-fernet-key}
+      CREDENTIAL_ENCRYPTION_KEY_FILE: ${CREDENTIAL_ENCRYPTION_KEY_FILE:-/data/secrets/credential_encryption_key}
+      APP_ROOT_PATH: ${APP_ROOT_PATH:-}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
+      OIDC_ENABLED: ${OIDC_ENABLED:-false}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-}
+      OIDC_METADATA_URL: ${OIDC_METADATA_URL:-}
+      OIDC_USERINFO_URL: ${OIDC_USERINFO_URL:-}
+      OIDC_TOKEN_URL: ${OIDC_TOKEN_URL:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-vmstig-tool}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-change-me}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
+      OIDC_SCOPES: ${OIDC_SCOPES:-openid profile email}
+      OIDC_CA_BUNDLE: ${OIDC_CA_BUNDLE:-}
+      OIDC_SSL_VERIFY: ${OIDC_SSL_VERIFY:-true}
+    volumes:
+      - ./backend/app:/app/app:Z
+      - ./data/reports:/data/reports
+      - ./data/ckl-exports:/data/ckl-exports
+      - ./data/secrets:/data/secrets
+      - ./stig-profiles:/usr/share/stigs:ro
+      - ./certs/dod-trust-combined.pem:/etc/ssl/certs/dod-trust.pem:ro
+    networks:
+      Stigman:
+        aliases:
+          - vmstigtool
+          - vmstigtool-web
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-stig}:${POSTGRES_PASSWORD:-stig}@postgres:5432/${POSTGRES_DB:-stigtool}
+      REDIS_URL: redis://redis:6379/0
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-change-me-use-fernet-key}
+      CREDENTIAL_ENCRYPTION_KEY_FILE: ${CREDENTIAL_ENCRYPTION_KEY_FILE:-/data/secrets/credential_encryption_key}
+    volumes:
+      - ./backend/app:/app/app:Z
+      - ./data/reports:/data/reports
+      - ./data/ckl-exports:/data/ckl-exports
+      - ./data/secrets:/data/secrets
+      - ./stig-profiles:/usr/share/stigs:ro
+    networks:
+      - Stigman
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-stig}:${POSTGRES_PASSWORD:-stig}@postgres:5432/${POSTGRES_DB:-stigtool}
+      REDIS_URL: redis://redis:6379/0
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-change-me-use-fernet-key}
+      CREDENTIAL_ENCRYPTION_KEY_FILE: ${CREDENTIAL_ENCRYPTION_KEY_FILE:-/data/secrets/credential_encryption_key}
+    volumes:
+      - ./backend/app:/app/app:Z
+      - ./data/secrets:/data/secrets
+    networks:
+      - Stigman
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pg-data:
