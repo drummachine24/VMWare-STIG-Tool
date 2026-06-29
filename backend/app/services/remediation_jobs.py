@@ -8,6 +8,7 @@ from app.services.finding_peers import (
     resolve_vcf_control_for_finding,
     validate_remediation_targets,
 )
+from app.services.remediation_engine import RemediationEngine
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ def create_remediation_job(
     control_id: str,
     vcf_control_id: str,
     target_result_ids: list[int],
+    variables_content: str | None = None,
 ) -> RemediationJob:
     source = (
         db.query(ScanResult)
@@ -45,6 +47,13 @@ def create_remediation_job(
         control_id,
     )
 
+    if variables_content:
+        RemediationEngine().generate_variables_content(
+            target_type=source.target_type,
+            vcf_control_id=vcf_id,
+            custom_content=variables_content,
+        )
+
     job = RemediationJob(
         scan_job_id=scan_job_id,
         source_result_id=source_result_id,
@@ -55,6 +64,7 @@ def create_remediation_job(
         status=RemediationStatus.PENDING.value,
         progress_total=len(targets),
         progress_message="Queued for remediation...",
+        variables_content=variables_content,
     )
     db.add(job)
     db.flush()

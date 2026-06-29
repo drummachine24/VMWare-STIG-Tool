@@ -36,6 +36,8 @@
     let peerSelections = {};
     let activeRemediationJobId = null;
     let remediationPollTimer = null;
+    let variablesPreviewCache = {};
+    let variablesPreviewDefault = "";
 
     const loading = document.getElementById("checklist-loading");
     const app = document.getElementById("checklist-app");
@@ -227,6 +229,34 @@
       });
     }
 
+    async function loadVariablesPreview(item) {
+      const rem = item.remediation || {};
+      const wrap = document.getElementById("detail-remediate-variables-wrap");
+      const textarea = document.getElementById("detail-remediate-variables");
+      const notesEl = document.getElementById("detail-remediate-variables-notes");
+      if (!wrap || !textarea) return;
+
+      const cacheKey = `${item.rule_id}|${item.control_id || ""}|${rem.vcf_control_id || ""}`;
+      const params = new URLSearchParams({
+        rule_id: item.rule_id,
+        control_id: item.control_id || "",
+        vcf_control_id: rem.vcf_control_id || "",
+      });
+      const resp = await fetch(
+        apiUrl(`/api/scans/${jobId}/results/${resultId}/remediation/preview?${params.toString()}`)
+      );
+      if (!resp.ok) throw new Error(await resp.text());
+      const preview = await resp.json();
+      variablesPreviewCache[cacheKey] = preview;
+      variablesPreviewDefault = preview.variables_content || "";
+      textarea.value = variablesPreviewDefault;
+      if (notesEl) {
+        const hint = preview.variables_hint ? ` Hint: ${preview.variables_hint}` : "";
+        notesEl.textContent = `${preview.notes || ""}${hint}`;
+      }
+      wrap.classList.remove("hidden");
+    }
+
     async function renderRemediatePanel(item) {
       const panel = document.getElementById("detail-remediate-panel");
       const btn = document.getElementById("detail-remediate-btn");
@@ -245,6 +275,14 @@
         if (btn) btn.disabled = true;
         const data = await loadPeers(item);
         renderPeerCheckboxes(data.peers || []);
+        try {
+          await loadVariablesPreview(item);
+        } catch (previewErr) {
+          const wrap = document.getElementById("detail-remediate-variables-wrap");
+          const notesEl = document.getElementById("detail-remediate-variables-notes");
+          if (wrap) wrap.classList.add("hidden");
+          if (notesEl) notesEl.textContent = `Could not load variables preview: ${previewErr.message}`;
+        }
         if (btn) btn.disabled = !!activeRemediationJobId;
       } catch (err) {
         const peersEl = document.getElementById("detail-remediate-peers");
@@ -280,6 +318,7 @@
           control_id: item.control_id || "",
           vcf_control_id: rem.vcf_control_id || "",
           target_result_ids: selectedIds,
+          variables_content: document.getElementById("detail-remediate-variables")?.value || null,
         }),
       });
       if (!resp.ok) throw new Error(await resp.text());
@@ -399,6 +438,13 @@
             alert(`Remediation failed to start: ${err.message}`);
             const btn = document.getElementById("detail-remediate-btn");
             if (btn) btn.disabled = false;
+          }
+        });
+
+        document.getElementById("detail-remediate-variables-reset")?.addEventListener("click", () => {
+          const textarea = document.getElementById("detail-remediate-variables");
+          if (textarea && variablesPreviewDefault) {
+            textarea.value = variablesPreviewDefault;
           }
         });
 

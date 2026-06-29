@@ -206,6 +206,16 @@ class RemediationRequest(BaseModel):
     control_id: str = ""
     vcf_control_id: str = ""
     target_result_ids: list[int] = Field(min_length=1)
+    variables_content: str | None = None
+
+
+class RemediationPreviewResponse(BaseModel):
+    vcf_control_id: str
+    script_name: str = ""
+    variables_name: str = ""
+    variables_hint: str = ""
+    variables_content: str
+    notes: str = ""
 
 
 class RemediationTargetResponse(BaseModel):

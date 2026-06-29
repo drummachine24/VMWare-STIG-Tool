@@ -69,6 +69,14 @@
             </button>
           </div>
           <p class="text-xs text-slate-400">Runs the official PowerCLI script for this control only on the selected targets.</p>
+          <div id="detail-remediate-variables-wrap" class="space-y-2 hidden">
+            <div class="flex items-center justify-between gap-2">
+              <label for="detail-remediate-variables" class="text-xs font-medium text-violet-200">Remediation variables file</label>
+              <button type="button" id="detail-remediate-variables-reset" class="text-xs text-slate-400 hover:text-white">Reset to default</button>
+            </div>
+            <p id="detail-remediate-variables-notes" class="text-xs text-slate-500"></p>
+            <textarea id="detail-remediate-variables" rows="14" spellcheck="false" class="w-full rounded-lg bg-slate-950 border border-violet-900/50 px-3 py-2 text-xs font-mono text-emerald-100"></textarea>
+          </div>
           <div id="detail-remediate-peers" class="space-y-2 max-h-40 overflow-y-auto"></div>
           <div id="detail-remediate-status" class="hidden text-sm rounded-lg border border-slate-700 bg-slate-900/70 p-3"></div>
         </div>

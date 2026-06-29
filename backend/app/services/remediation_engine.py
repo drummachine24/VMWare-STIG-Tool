@@ -170,6 +170,7 @@ class RemediationEngine:
         *,
         vcf_control_id: str,
         scan_inputs_yaml: str | None = None,
+        strict_ntp: bool = True,
     ) -> str:
         content = variables_path.read_text(encoding="utf-8", errors="replace")
 
@@ -186,17 +187,109 @@ class RemediationEngine:
 
         if enabled_rule_key.upper() == NTP_CONTROL_KEY:
             ntp_servers = self._parse_ntp_servers(scan_inputs_yaml)
-            if not ntp_servers:
+            if ntp_servers:
+                updated = self._inject_envstig_settings(
+                    updated,
+                    vcf_control_id=vcf_control_id,
+                    ntp_servers=ntp_servers,
+                )
+            elif strict_ntp:
                 raise ValueError(
                     "VCFE-9X-000121 requires authorized NTP servers. Set REMEDIATION_ESXI_NTP_SERVERS "
-                    "in the environment or esx_ntpServers in the scan job inputs YAML."
+                    "in the environment, esx_ntpServers in scan inputs, or edit ntpServers in the "
+                    "remediation variables editor before running."
                 )
-            updated = self._inject_envstig_settings(
-                updated,
-                vcf_control_id=vcf_control_id,
-                ntp_servers=ntp_servers,
-            )
         return updated
+
+    def _validate_variables_content(self, content: str, enabled_rule_key: str) -> None:
+        if not content or not content.strip():
+            raise ValueError("Remediation variables file cannot be empty")
+        if len(content) > 512_000:
+            raise ValueError("Remediation variables file is too large")
+        if "\x00" in content:
+            raise ValueError("Remediation variables file contains invalid characters")
+        if "$rulesenabled" not in content:
+            raise ValueError("Remediation variables file must define $rulesenabled")
+        if not re.search(rf"{re.escape(enabled_rule_key)}\s*=\s*\$true", content, re.IGNORECASE):
+            raise ValueError(
+                f"Remediation variables file must keep {enabled_rule_key} enabled ($true)"
+            )
+
+    def generate_variables_content(
+        self,
+        *,
+        target_type: str,
+        vcf_control_id: str,
+        scan_inputs_yaml: str | None = None,
+        custom_content: str | None = None,
+        strict_ntp: bool | None = None,
+    ) -> str:
+        rule_key = _control_key(vcf_control_id)
+        if not rule_key:
+            raise ValueError(f"Invalid VCF control id: {vcf_control_id}")
+
+        if custom_content is not None:
+            self._validate_variables_content(custom_content, rule_key)
+            return custom_content
+
+        bundle = _resolve_powercli_bundle(self.catalog.powercli_dir, target_type)
+        if not bundle:
+            raise FileNotFoundError(
+                f"No PowerCLI remediation bundle for target type {target_type}"
+            )
+        variables_path: Path | None = bundle.get("variables_path")
+        if not variables_path or not variables_path.exists():
+            raise FileNotFoundError("Remediation variables file not found")
+
+        ntp_strict = strict_ntp if strict_ntp is not None else True
+        return self._build_variables_override(
+            variables_path,
+            rule_key,
+            vcf_control_id=vcf_control_id,
+            scan_inputs_yaml=scan_inputs_yaml,
+            strict_ntp=ntp_strict,
+        )
+
+    def preview_remediation(
+        self,
+        *,
+        target_type: str,
+        vcf_control_id: str,
+        scan_inputs_yaml: str | None = None,
+    ) -> dict:
+        bundle = _resolve_powercli_bundle(self.catalog.powercli_dir, target_type)
+        if not bundle:
+            raise FileNotFoundError(
+                f"No PowerCLI remediation bundle for target type {target_type}"
+            )
+        lookup = self.catalog.lookup(target_type, vcf_control_id)
+        content = self.generate_variables_content(
+            target_type=target_type,
+            vcf_control_id=vcf_control_id,
+            scan_inputs_yaml=scan_inputs_yaml,
+            strict_ntp=False,
+        )
+        if _control_key(vcf_control_id) == NTP_CONTROL_KEY and "ntpServers = @()" in content:
+            notes = (
+                "Edit the $envstigsettings section for environment-specific values "
+                "(for example ntpServers, allowedips, lockdownExceptionUsers, esxAdminsGroup). "
+                "Only the selected control remains enabled in $rulesenabled. "
+                "For VCFE-9X-000121, set ntpServers to your authorized NTP server list before running."
+            )
+        else:
+            notes = (
+                "Edit the $envstigsettings section for environment-specific values "
+                "(for example ntpServers, allowedips, lockdownExceptionUsers, esxAdminsGroup). "
+                "Only the selected control remains enabled in $rulesenabled."
+            )
+        return {
+            "vcf_control_id": vcf_control_id,
+            "script_name": bundle["script_path"].name,
+            "variables_name": bundle.get("variables_path").name if bundle.get("variables_path") else "",
+            "variables_hint": lookup.get("variables_hint") or "",
+            "variables_content": content,
+            "notes": notes,
+        }
 
     def _launcher_script(
         self,
@@ -251,6 +344,7 @@ class RemediationEngine:
         vcf_control_id: str,
         remediation_job_id: int,
         scan_inputs_yaml: str | None = None,
+        variables_override: str | None = None,
     ) -> dict:
         if self.settings.dry_run:
             return {
@@ -289,11 +383,11 @@ class RemediationEngine:
             encoding="utf-8",
         )
         (work_dir / variables_name).write_text(
-            self._build_variables_override(
-                variables_path,
-                rule_key,
+            self.generate_variables_content(
+                target_type=target_type,
                 vcf_control_id=vcf_control_id,
                 scan_inputs_yaml=scan_inputs_yaml,
+                custom_content=variables_override,
             ),
             encoding="utf-8",
         )

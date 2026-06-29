@@ -51,6 +51,7 @@ _REMEDIATION_JOB_COLUMNS = [
     ("progress_message", "TEXT"),
     ("progress_current", "INTEGER DEFAULT 0"),
     ("progress_total", "INTEGER DEFAULT 0"),
+    ("variables_content", "TEXT"),
 ]
 
 

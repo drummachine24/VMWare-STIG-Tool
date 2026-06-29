@@ -12,6 +12,7 @@ from app.models import ScanJob, ScanResult, ScanStatus, VCenterConnection
 from app.schemas import (
     RemediationJobResponse,
     RemediationPeersResponse,
+    RemediationPreviewResponse,
     RemediationRequest,
     ScanJobCreate,
     ScanJobResponse,
@@ -22,6 +23,7 @@ from app.schemas import (
 )
 from app.services.finding_peers import list_remediation_peers
 from app.services.remediation_jobs import create_remediation_job, get_remediation_job
+from app.services.remediation_engine import RemediationEngine
 from app.services.scan_progress import mark_cancelled, parse_selected_targets
 from app.services.checklist_service import build_checklist_payload, ensure_result_counts
 from app.services.scan_rescan import rescan_job
@@ -209,6 +211,51 @@ def get_remediation_peers(
     return RemediationPeersResponse(**payload)
 
 
+@router.get(
+    "/{job_id}/results/{result_id}/remediation/preview",
+    response_model=RemediationPreviewResponse,
+)
+def preview_remediation(
+    job_id: int,
+    result_id: int,
+    rule_id: str,
+    control_id: str = "",
+    vcf_control_id: str = "",
+    db: Session = Depends(get_db),
+    _user=Depends(require_remediator),
+):
+    result = (
+        db.query(ScanResult)
+        .filter(ScanResult.id == result_id, ScanResult.scan_job_id == job_id)
+        .first()
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Scan result not found")
+    scan_job = db.get(ScanJob, job_id)
+    if not scan_job:
+        raise HTTPException(status_code=404, detail="Scan job not found")
+
+    from app.services.finding_peers import resolve_vcf_control_for_finding
+
+    vcf_id = vcf_control_id or resolve_vcf_control_for_finding(
+        result.target_type, rule_id, control_id
+    )
+    if not vcf_id:
+        raise HTTPException(status_code=400, detail="Could not resolve VCF control id")
+
+    try:
+        payload = RemediationEngine().preview_remediation(
+            target_type=result.target_type,
+            vcf_control_id=vcf_id,
+            scan_inputs_yaml=scan_job.inputs_yaml,
+        )
+        return RemediationPreviewResponse(**payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.post(
     "/{job_id}/results/{result_id}/remediation",
     response_model=RemediationJobResponse,
@@ -230,6 +277,7 @@ def start_remediation(
             payload.control_id,
             payload.vcf_control_id,
             payload.target_result_ids,
+            variables_content=payload.variables_content,
         )
         return job
     except ValueError as exc:
