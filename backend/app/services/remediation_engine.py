@@ -44,10 +44,31 @@ class RemediationEngine:
             shutil.rmtree(module_dir)
         module_dir.mkdir(parents=True, exist_ok=True)
         shutil.unpack_archive(str(zips[0]), str(module_dir))
-        psd1 = next(module_dir.rglob("*.psd1"), None)
+
+        preferred = sorted(module_dir.rglob("VMware.VCF.STIG.Helpers.psd1"))
+        psd1 = preferred[0] if preferred else None
         if not psd1:
-            raise FileNotFoundError(f"No module manifest found in {zips[0]}")
-        return psd1.parent
+            all_psd1 = sorted(module_dir.rglob("*.psd1"))
+            if not all_psd1:
+                raise FileNotFoundError(f"No module manifest found in {zips[0]}")
+            psd1 = all_psd1[0]
+
+        psm1 = psd1.with_suffix(".psm1")
+        if not psm1.exists():
+            sibling_psm1 = next(psd1.parent.glob("*.psm1"), None)
+            if not sibling_psm1:
+                extracted = sorted(
+                    str(path.relative_to(module_dir))
+                    for path in module_dir.rglob("*")
+                    if path.is_file()
+                )
+                preview = "\n".join(extracted[:40]) or "(no files extracted)"
+                raise FileNotFoundError(
+                    f"Helpers module manifest {psd1.name} has no companion .psm1. "
+                    f"Check {zips[0]} is intact (not a Git LFS pointer). Extracted:\n{preview}"
+                )
+
+        return psd1
 
     def _build_global_override(
         self,
@@ -100,13 +121,13 @@ class RemediationEngine:
         script_path: Path,
         global_file: str,
         variables_file: str,
-        helpers_module_dir: Path,
+        helpers_manifest: Path,
     ) -> str:
         return (
             textwrap.dedent(
                 f"""
                 $ErrorActionPreference = "Stop"
-                Import-Module "{helpers_module_dir.as_posix()}" -Force
+                Import-Module "{helpers_manifest.as_posix()}" -Force
                 Set-PowerCLIConfiguration -Scope User -ParticipateInCEIP $false -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
                 Set-PowerCLIConfiguration -Scope User -ParticipateInCeip $false -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
                 Set-PowerCLIConfiguration -Scope User -InvalidCertificateAction Ignore -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
@@ -170,14 +191,14 @@ class RemediationEngine:
             encoding="utf-8",
         )
 
-        helpers_dir = self._ensure_helpers(script_path.parent, work_dir)
+        helpers_manifest = self._ensure_helpers(script_path.parent, work_dir)
         launcher_path = work_dir / launcher_name
         launcher_path.write_text(
             self._launcher_script(
                 script_path=script_path,
                 global_file=global_name,
                 variables_file=variables_name,
-                helpers_module_dir=helpers_dir,
+                helpers_manifest=helpers_manifest,
             ),
             encoding="utf-8",
         )
