@@ -125,7 +125,7 @@ class RemediationEngine:
             )
         return updated
 
-    def _patch_esxi_script(content: str) -> str:
+    def _patch_esxi_script(self, content: str) -> str:
         """Broadcom NTP block assumes ntpconfig.server is never null."""
         content = content.replace(
             'If($currentntpservers.count -eq "0"){',
