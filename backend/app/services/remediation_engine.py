@@ -15,7 +15,9 @@ from app.services.remediation_catalog import RemediationCatalog, _control_key, _
 logger = logging.getLogger(__name__)
 
 RULE_ENABLED_LINE = re.compile(r"^(\s*)(VCF[A-Z0-9]+)\s*=\s*\$(true|false)", re.IGNORECASE | re.MULTILINE)
+NTP_SERVERS_LINE = re.compile(r"^(\s*ntpServers\s*=\s*)@\(.*\)(.*)$", re.MULTILINE | re.IGNORECASE)
 HELPERS_ZIP_GLOB = "VMware.VCF.STIG.Helpers-*.zip"
+NTP_CONTROL_KEY = "VCFE9X000121"
 
 
 class RemediationEngine:
@@ -70,6 +72,71 @@ class RemediationEngine:
 
         return psd1
 
+    def _parse_ntp_servers(self, scan_inputs_yaml: str | None = None) -> list[str]:
+        servers: list[str] = []
+        if scan_inputs_yaml:
+            try:
+                import yaml
+
+                parsed = yaml.safe_load(scan_inputs_yaml) or {}
+                if isinstance(parsed, dict):
+                    raw = parsed.get("esx_ntpServers") or parsed.get("vcenter_ntpServers")
+                    if isinstance(raw, list):
+                        servers = [str(item).strip() for item in raw if str(item).strip()]
+                    elif isinstance(raw, str) and raw.strip():
+                        servers = [part.strip() for part in raw.split(",") if part.strip()]
+            except Exception as exc:
+                logger.warning("Could not parse scan inputs for NTP servers: %s", exc)
+
+        if not servers and self.settings.remediation_esxi_ntp_servers.strip():
+            servers = [
+                part.strip()
+                for part in self.settings.remediation_esxi_ntp_servers.split(",")
+                if part.strip()
+            ]
+        return servers
+
+    def _format_ps_string_array(self, values: list[str]) -> str:
+        parts: list[str] = []
+        for value in values:
+            escaped = value.replace("`", "``").replace('"', '`"')
+            parts.append(f'"{escaped}"')
+        return "@(" + ", ".join(parts) + ")"
+
+    def _inject_envstig_settings(
+        self,
+        content: str,
+        *,
+        vcf_control_id: str,
+        ntp_servers: list[str],
+    ) -> str:
+        if _control_key(vcf_control_id) != NTP_CONTROL_KEY or not ntp_servers:
+            return content
+
+        ps_array = self._format_ps_string_array(ntp_servers)
+
+        def repl(match: re.Match) -> str:
+            return f"{match.group(1)}{ps_array}{match.group(2)}"
+
+        updated, count = NTP_SERVERS_LINE.subn(repl, content, count=1)
+        if count == 0:
+            raise ValueError(
+                "Could not locate envstigsettings.ntpServers in remediation variables file"
+            )
+        return updated
+
+    def _patch_esxi_script(content: str) -> str:
+        """Broadcom NTP block assumes ntpconfig.server is never null."""
+        content = content.replace(
+            'If($currentntpservers.count -eq "0"){',
+            "If(-not $currentntpservers -or @($currentntpservers).Count -eq 0){",
+        )
+        content = content.replace(
+            "If($currentntpservers.count -ne 0){",
+            "If($currentntpservers -and @($currentntpservers).Count -ne 0){",
+        )
+        return content
+
     def _build_global_override(
         self,
         vcenter_hostname: str,
@@ -100,6 +167,9 @@ class RemediationEngine:
         self,
         variables_path: Path,
         enabled_rule_key: str,
+        *,
+        vcf_control_id: str,
+        scan_inputs_yaml: str | None = None,
     ) -> str:
         content = variables_path.read_text(encoding="utf-8", errors="replace")
 
@@ -112,6 +182,19 @@ class RemediationEngine:
         if updated == content:
             raise ValueError(
                 f"Could not locate rulesenabled entry for {enabled_rule_key} in {variables_path.name}"
+            )
+
+        if enabled_rule_key.upper() == NTP_CONTROL_KEY:
+            ntp_servers = self._parse_ntp_servers(scan_inputs_yaml)
+            if not ntp_servers:
+                raise ValueError(
+                    "VCFE-9X-000121 requires authorized NTP servers. Set REMEDIATION_ESXI_NTP_SERVERS "
+                    "in the environment or esx_ntpServers in the scan job inputs YAML."
+                )
+            updated = self._inject_envstig_settings(
+                updated,
+                vcf_control_id=vcf_control_id,
+                ntp_servers=ntp_servers,
             )
         return updated
 
@@ -167,6 +250,7 @@ class RemediationEngine:
         target_name: str,
         vcf_control_id: str,
         remediation_job_id: int,
+        scan_inputs_yaml: str | None = None,
     ) -> dict:
         if self.settings.dry_run:
             return {
@@ -205,12 +289,20 @@ class RemediationEngine:
             encoding="utf-8",
         )
         (work_dir / variables_name).write_text(
-            self._build_variables_override(variables_path, rule_key),
+            self._build_variables_override(
+                variables_path,
+                rule_key,
+                vcf_control_id=vcf_control_id,
+                scan_inputs_yaml=scan_inputs_yaml,
+            ),
             encoding="utf-8",
         )
 
         local_script_path = work_dir / script_path.name
         shutil.copy2(script_path, local_script_path)
+        if target_type == ScanTargetType.ESXI.value:
+            patched = self._patch_esxi_script(local_script_path.read_text(encoding="utf-8", errors="replace"))
+            local_script_path.write_text(patched, encoding="utf-8")
 
         helpers_manifest = self._ensure_helpers(script_path.parent, work_dir)
         launcher_path = work_dir / launcher_name

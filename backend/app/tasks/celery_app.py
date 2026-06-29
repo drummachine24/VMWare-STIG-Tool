@@ -283,6 +283,7 @@ def run_remediation_job(self, remediation_job_id: int) -> dict:
                     target.target_name,
                     job.vcf_control_id,
                     remediation_job_id,
+                    scan_inputs_yaml=scan_job.inputs_yaml,
                 )
                 target.status = result["status"]
                 target.message = result.get("message")

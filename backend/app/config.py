@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     dry_run: bool = False
     scan_timeout_seconds: int = 7200
     ckl_export_allowed_roots: str = "/data/reports,/data/ckl-exports"
+    # Comma-separated ESXi NTP servers injected for VCFE-9X-000121 remediation
+    remediation_esxi_ntp_servers: str = "time-a-g.nist.gov,time-b-g.nist.gov"
 
     # Public URL and reverse-proxy subpath (e.g. /vmstigtool behind nginx)
     app_root_path: str = ""
