@@ -1,0 +1,65 @@
+html {
+  height: 100%;
+}
+
+body.app-shell {
+  min-height: 100dvh;
+  min-height: 100vh;
+}
+
+.app-shell main {
+  width: 100%;
+  max-width: none;
+}
+
+.page-stack {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.page-fill {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.checklist-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.checklist-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-height: 18rem;
+}
+
+@media (min-width: 1024px) {
+  .checklist-panel {
+    min-height: 0;
+    height: 100%;
+  }
+}
+
+.checklist-panel-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.inventory-tree-panel {
+  min-height: 16rem;
+  max-height: min(70vh, calc(100dvh - 18rem));
+}
+
+@media (min-width: 1024px) {
+  .inventory-tree-panel {
+    min-height: 24rem;
+    max-height: min(75vh, calc(100dvh - 14rem));
+  }
+}

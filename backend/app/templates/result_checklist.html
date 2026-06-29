@@ -1,87 +1,92 @@
 {% extends "base.html" %}
 {% block title %}Checklist — {{ result.target_name }}{% endblock %}
+{% block main_class %}min-h-0{% endblock %}
 {% block content %}
-<div class="mb-4">
-  <a href="{{ url('/scans/' ~ job.id) }}" class="text-slate-400 hover:text-white text-sm">← Back to scan</a>
-  <h1 class="text-2xl font-bold mt-2">{{ result.target_name }}</h1>
-  <p class="text-slate-400 text-sm">{{ result.target_type }} · STIG checklist viewer</p>
-</div>
-
-<div id="checklist-loading" class="rounded-xl border border-slate-800 p-8 text-center text-slate-400">
-  Loading checklist...
-</div>
-
-<div id="checklist-app" class="hidden">
-  <div id="remediation-sync-banner" class="hidden rounded-xl border border-amber-800/60 bg-amber-950/40 p-3 mb-4 text-sm text-amber-200"></div>
-  <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-4 mb-4 flex flex-wrap items-center gap-4">
-    <div id="checklist-counts" class="flex flex-wrap gap-2 text-sm"></div>
-    <div class="ml-auto flex gap-2 text-sm">
-      <a id="checklist-json-link" href="#" class="text-sky-400 hover:underline hidden">Download JSON</a>
-      <a id="checklist-ckl-link" href="#" class="text-emerald-400 hover:underline hidden">Download CKL</a>
-    </div>
+<div class="page-stack gap-4">
+  <div class="shrink-0">
+    <a href="{{ url('/scans/' ~ job.id) }}" class="text-slate-400 hover:text-white text-sm">← Back to scan</a>
+    <h1 class="text-2xl font-bold mt-2">{{ result.target_name }}</h1>
+    <p class="text-slate-400 text-sm">{{ result.target_type }} · STIG checklist viewer</p>
   </div>
 
-  <div class="grid lg:grid-cols-12 gap-4 min-h-[32rem]">
-    <aside class="lg:col-span-4 xl:col-span-3 rounded-xl border border-slate-800 bg-slate-950/60 flex flex-col max-h-[70vh]">
-      <div class="p-3 border-b border-slate-800 space-y-2">
-        <input id="checklist-search" type="search" placeholder="Search rules..." class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm">
-        <div class="flex flex-wrap gap-1 text-xs">
-          <button type="button" data-filter="all" class="checklist-filter px-2 py-1 rounded bg-emerald-900/50 text-emerald-300">All</button>
-          <button type="button" data-filter="O" class="checklist-filter px-2 py-1 rounded border border-slate-700 text-red-300">Open</button>
-          <button type="button" data-filter="NF" class="checklist-filter px-2 py-1 rounded border border-slate-700 text-emerald-300">NF</button>
-          <button type="button" data-filter="NR" class="checklist-filter px-2 py-1 rounded border border-slate-700 text-amber-300">NR</button>
-          <button type="button" data-filter="NA" class="checklist-filter px-2 py-1 rounded border border-slate-700 text-slate-400">NA</button>
-        </div>
-      </div>
-      <ul id="checklist-rule-list" class="overflow-y-auto flex-1 p-2 space-y-1 text-sm"></ul>
-    </aside>
+  <div id="checklist-loading" class="rounded-xl border border-slate-800 p-8 text-center text-slate-400">
+    Loading checklist...
+  </div>
 
-    <section class="lg:col-span-8 xl:col-span-9 rounded-xl border border-slate-800 bg-slate-900/40 p-5 max-h-[70vh] overflow-y-auto">
-      <div id="checklist-detail-empty" class="text-slate-500 text-sm">Select a rule from the list.</div>
-      <div id="checklist-detail" class="hidden space-y-4">
-        <div>
-          <div id="detail-status" class="inline-block px-2 py-0.5 rounded text-xs font-medium mb-2"></div>
-          <h2 id="detail-title" class="text-lg font-semibold"></h2>
-          <p id="detail-meta" class="text-xs text-slate-500 mt-1"></p>
-        </div>
-        <div>
-          <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-1">Check content</h3>
-          <pre id="detail-check" class="text-sm text-slate-300 whitespace-pre-wrap rounded-lg bg-slate-950 border border-slate-800 p-3"></pre>
-        </div>
-        <div>
-          <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-1">Finding details</h3>
-          <pre id="detail-finding" class="text-sm text-slate-300 whitespace-pre-wrap rounded-lg bg-slate-950 border border-slate-800 p-3"></pre>
-        </div>
-        <div>
-          <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-1">Fix text</h3>
-          <pre id="detail-fix" class="text-sm text-slate-300 whitespace-pre-wrap rounded-lg bg-slate-950 border border-slate-800 p-3"></pre>
-        </div>
-        <div>
-          <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-1">Remediation (from dod-compliance-and-automation)</h3>
-          <div id="detail-remediation-meta" class="text-xs text-slate-400 mb-2 space-y-1"></div>
-          <pre id="detail-remediation" class="text-xs text-emerald-100 whitespace-pre-wrap overflow-x-auto rounded-lg bg-slate-950 border border-emerald-900/40 p-3 font-mono max-h-96"></pre>
-        </div>
-        <div id="detail-remediate-panel" class="hidden rounded-xl border border-violet-900/50 bg-violet-950/20 p-4 space-y-3" data-tour="checklist-remediate">
-          <div class="flex items-center justify-between gap-3">
-            <h3 class="text-sm font-medium text-violet-200">Run remediation</h3>
-            <button id="detail-remediate-btn" type="button" class="px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-600 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-              Remediate selected
-            </button>
-          </div>
-          <p class="text-xs text-slate-400">Runs the official PowerCLI script for this control only on the selected targets.</p>
-          <div id="detail-remediate-variables-wrap" class="space-y-2 hidden">
-            <div class="flex items-center justify-between gap-2">
-              <label for="detail-remediate-variables" class="text-xs font-medium text-violet-200">Remediation variables file</label>
-              <button type="button" id="detail-remediate-variables-reset" class="text-xs text-slate-400 hover:text-white">Reset to default</button>
-            </div>
-            <p id="detail-remediate-variables-notes" class="text-xs text-slate-500"></p>
-            <textarea id="detail-remediate-variables" rows="14" spellcheck="false" class="w-full rounded-lg bg-slate-950 border border-violet-900/50 px-3 py-2 text-xs font-mono text-emerald-100"></textarea>
-          </div>
-          <div id="detail-remediate-peers" class="space-y-2 max-h-40 overflow-y-auto"></div>
-          <div id="detail-remediate-status" class="hidden text-sm rounded-lg border border-slate-700 bg-slate-900/70 p-3"></div>
-        </div>
+  <div id="checklist-app" class="hidden page-fill gap-4">
+    <div id="remediation-sync-banner" class="hidden shrink-0 rounded-xl border border-amber-800/60 bg-amber-950/40 p-3 text-sm text-amber-200"></div>
+    <div class="shrink-0 rounded-xl border border-slate-800 bg-slate-900/50 p-4 flex flex-wrap items-center gap-4">
+      <div id="checklist-counts" class="flex flex-wrap gap-2 text-sm"></div>
+      <div class="ml-auto flex gap-2 text-sm">
+        <a id="checklist-json-link" href="#" class="text-sky-400 hover:underline hidden">Download JSON</a>
+        <a id="checklist-ckl-link" href="#" class="text-emerald-400 hover:underline hidden">Download CKL</a>
       </div>
-    </section>
+    </div>
+
+    <div class="checklist-grid grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0">
+      <aside class="checklist-panel lg:col-span-4 xl:col-span-3 rounded-xl border border-slate-800 bg-slate-950/60">
+        <div class="shrink-0 p-3 border-b border-slate-800 space-y-2">
+          <input id="checklist-search" type="search" placeholder="Search rules..." class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm">
+          <div class="flex flex-wrap gap-1 text-xs">
+            <button type="button" data-filter="all" class="checklist-filter px-2 py-1 rounded bg-emerald-900/50 text-emerald-300">All</button>
+            <button type="button" data-filter="O" class="checklist-filter px-2 py-1 rounded border border-slate-700 text-red-300">Open</button>
+            <button type="button" data-filter="NF" class="checklist-filter px-2 py-1 rounded border border-slate-700 text-emerald-300">NF</button>
+            <button type="button" data-filter="NR" class="checklist-filter px-2 py-1 rounded border border-slate-700 text-amber-300">NR</button>
+            <button type="button" data-filter="NA" class="checklist-filter px-2 py-1 rounded border border-slate-700 text-slate-400">NA</button>
+          </div>
+        </div>
+        <ul id="checklist-rule-list" class="checklist-panel-scroll p-2 space-y-1 text-sm"></ul>
+      </aside>
+
+      <section class="checklist-panel lg:col-span-8 xl:col-span-9 rounded-xl border border-slate-800 bg-slate-900/40">
+        <div class="checklist-panel-scroll p-5">
+          <div id="checklist-detail-empty" class="text-slate-500 text-sm">Select a rule from the list.</div>
+          <div id="checklist-detail" class="hidden space-y-4">
+            <div>
+              <div id="detail-status" class="inline-block px-2 py-0.5 rounded text-xs font-medium mb-2"></div>
+              <h2 id="detail-title" class="text-lg font-semibold"></h2>
+              <p id="detail-meta" class="text-xs text-slate-500 mt-1"></p>
+            </div>
+            <div>
+              <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-1">Check content</h3>
+              <pre id="detail-check" class="text-sm text-slate-300 whitespace-pre-wrap rounded-lg bg-slate-950 border border-slate-800 p-3"></pre>
+            </div>
+            <div>
+              <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-1">Finding details</h3>
+              <pre id="detail-finding" class="text-sm text-slate-300 whitespace-pre-wrap rounded-lg bg-slate-950 border border-slate-800 p-3"></pre>
+            </div>
+            <div>
+              <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-1">Fix text</h3>
+              <pre id="detail-fix" class="text-sm text-slate-300 whitespace-pre-wrap rounded-lg bg-slate-950 border border-slate-800 p-3"></pre>
+            </div>
+            <div>
+              <h3 class="text-xs uppercase tracking-wide text-slate-500 mb-1">Remediation (from dod-compliance-and-automation)</h3>
+              <div id="detail-remediation-meta" class="text-xs text-slate-400 mb-2 space-y-1"></div>
+              <pre id="detail-remediation" class="text-xs text-emerald-100 whitespace-pre-wrap overflow-x-auto rounded-lg bg-slate-950 border border-emerald-900/40 p-3 font-mono max-h-[min(24rem,40vh)]"></pre>
+            </div>
+            <div id="detail-remediate-panel" class="hidden rounded-xl border border-violet-900/50 bg-violet-950/20 p-4 space-y-3" data-tour="checklist-remediate">
+              <div class="flex items-center justify-between gap-3">
+                <h3 class="text-sm font-medium text-violet-200">Run remediation</h3>
+                <button id="detail-remediate-btn" type="button" class="px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-600 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                  Remediate selected
+                </button>
+              </div>
+              <p class="text-xs text-slate-400">Runs the official PowerCLI script for this control only on the selected targets.</p>
+              <div id="detail-remediate-variables-wrap" class="space-y-2 hidden">
+                <div class="flex items-center justify-between gap-2">
+                  <label for="detail-remediate-variables" class="text-xs font-medium text-violet-200">Remediation variables file</label>
+                  <button type="button" id="detail-remediate-variables-reset" class="text-xs text-slate-400 hover:text-white">Reset to default</button>
+                </div>
+                <p id="detail-remediate-variables-notes" class="text-xs text-slate-500"></p>
+                <textarea id="detail-remediate-variables" rows="14" spellcheck="false" class="w-full min-h-[12rem] max-h-[min(28rem,45vh)] rounded-lg bg-slate-950 border border-violet-900/50 px-3 py-2 text-xs font-mono text-emerald-100 resize-y"></textarea>
+              </div>
+              <div id="detail-remediate-peers" class="space-y-2 max-h-[min(10rem,20vh)] overflow-y-auto"></div>
+              <div id="detail-remediate-status" class="hidden text-sm rounded-lg border border-slate-700 bg-slate-900/70 p-3"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
   </div>
 </div>
 {% endblock %}

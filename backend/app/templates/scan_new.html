@@ -8,7 +8,7 @@
   Add a <a href="{{ url('/vcenters') }}" class="underline">vCenter connection</a> before running scans.
 </div>
 {% else %}
-<form method="post" action="{{ url('/scans') }}" id="scan-form" class="max-w-3xl space-y-6" data-tour="scan-form">
+<form method="post" action="{{ url('/scans') }}" id="scan-form" class="w-full max-w-none space-y-6" data-tour="scan-form">
   <input type="hidden" name="selected_targets_json" id="selected-targets-json" value="">
   <div>
     <label class="block text-sm text-slate-400 mb-1">Scan Name</label>
@@ -30,7 +30,7 @@
       <button type="button" id="select-all-btn" class="text-xs rounded border border-slate-700 px-3 py-1 hover:bg-slate-800">Select all</button>
       <button type="button" id="deselect-all-btn" class="text-xs rounded border border-slate-700 px-3 py-1 hover:bg-slate-800">Deselect all</button>
     </div>
-    <div id="inventory-tree" class="rounded-lg border border-slate-800 bg-slate-950/50 p-4 max-h-96 overflow-y-auto"></div>
+    <div id="inventory-tree" class="inventory-tree-panel rounded-lg border border-slate-800 bg-slate-950/50 p-4 overflow-y-auto"></div>
   </fieldset>
 
   <fieldset class="rounded-xl border border-slate-800 p-5 space-y-3">

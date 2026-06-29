@@ -9,10 +9,11 @@
   <script>window.APP_BASE = {{ root_path|tojson }};</script>
   <script src="{{ url('/static/app.js') }}"></script>
   <link rel="stylesheet" href="{{ url('/static/tour-guide.css') }}?v={{ tour_static_version }}">
+  <link rel="stylesheet" href="{{ url('/static/app-layout.css') }}">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen">
-  <nav class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-6 flex-wrap">
+<body class="bg-slate-950 text-slate-100 app-shell flex flex-col min-h-dvh">
+  <nav class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-10 shrink-0 w-full">
+    <div class="w-full px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-4 sm:gap-6 flex-wrap">
       <a href="{{ url('/') }}" class="font-semibold text-emerald-400" data-tour="welcome">VMware STIG Tool</a>
       {% if current_user and current_user.can_view() %}
       <a href="{{ url('/') }}" class="text-slate-300 hover:text-white text-sm">Dashboard</a>
@@ -40,7 +41,7 @@
       </div>
     </div>
   </nav>
-  <main class="max-w-6xl mx-auto px-4 py-8">
+  <main class="flex-1 w-full min-h-0 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex flex-col {% block main_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
   {% if current_user and current_user.can_view() %}
