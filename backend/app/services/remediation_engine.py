@@ -128,6 +128,24 @@ class RemediationEngine:
                 f"""
                 $ErrorActionPreference = "Stop"
                 Import-Module "{helpers_manifest.as_posix()}" -Force
+
+                # Legacy helpers still referenced in some upstream remediation blocks.
+                function global:Write-ToConsole {{
+                    param([string]$Details)
+                    $LogDate = Get-Date -Format T
+                    Write-Host "$($LogDate) $Details"
+                }}
+                function global:Write-ToConsoleRed {{
+                    param([string]$Details)
+                    $LogDate = Get-Date -Format T
+                    Write-Host "$($LogDate) $Details" -ForegroundColor Red
+                }}
+                function global:Write-ToConsoleBlue {{
+                    param([string]$Details)
+                    $LogDate = Get-Date -Format T
+                    Write-Host "$($LogDate) $Details" -ForegroundColor Blue
+                }}
+
                 Set-PowerCLIConfiguration -Scope User -ParticipateInCEIP $false -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
                 Set-PowerCLIConfiguration -Scope User -ParticipateInCeip $false -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
                 Set-PowerCLIConfiguration -Scope User -InvalidCertificateAction Ignore -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
