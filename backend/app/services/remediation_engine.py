@@ -191,15 +191,16 @@ class RemediationEngine:
             encoding="utf-8",
         )
 
+        local_script_path = work_dir / script_path.name
+        shutil.copy2(script_path, local_script_path)
+
         helpers_manifest = self._ensure_helpers(script_path.parent, work_dir)
-        global_path = (work_dir / global_name).as_posix()
-        variables_path_generated = (work_dir / variables_name).as_posix()
         launcher_path = work_dir / launcher_name
         launcher_path.write_text(
             self._launcher_script(
-                script_path=script_path,
-                global_file=global_path,
-                variables_file=variables_path_generated,
+                script_path=local_script_path,
+                global_file=global_name,
+                variables_file=variables_name,
                 helpers_manifest=helpers_manifest,
             ),
             encoding="utf-8",
