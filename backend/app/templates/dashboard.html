@@ -2,7 +2,8 @@
 {% block title %}Dashboard — VMware STIG Tool{% endblock %}
 {% block content %}
 <h1 class="text-2xl font-bold mb-6" data-tour="welcome">Dashboard</h1>
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+
+<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
   <div class="rounded-xl border border-slate-800 bg-slate-900 p-5">
     <div class="text-slate-400 text-sm">vCenter Connections</div>
     <div class="text-3xl font-bold text-emerald-400">{{ vcenter_count }}</div>
@@ -12,11 +13,111 @@
     <div class="text-3xl font-bold text-sky-400">{{ schedule_count }}</div>
   </div>
   <div class="rounded-xl border border-slate-800 bg-slate-900 p-5">
-    <a href="{{ url('/scans/new') }}" class="inline-block mt-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium">Run New Scan</a>
+    <div class="text-slate-400 text-sm">Targets (latest scan)</div>
+    <div class="text-3xl font-bold text-violet-400">{{ metrics.target_count }}</div>
+  </div>
+  <div class="rounded-xl border border-red-900/50 bg-red-950/20 p-5">
+    <div class="text-red-300 text-sm">Open findings</div>
+    <div class="text-3xl font-bold text-red-400">{{ metrics.totals.open }}</div>
+  </div>
+  <div class="rounded-xl border border-amber-900/50 bg-amber-950/20 p-5">
+    <div class="text-amber-300 text-sm">Not reviewed</div>
+    <div class="text-3xl font-bold text-amber-400">{{ metrics.totals.nr }}</div>
+  </div>
+  <div class="rounded-xl border border-slate-700 bg-slate-900 p-5">
+    <div class="text-slate-400 text-sm">Not applicable</div>
+    <div class="text-3xl font-bold text-slate-300">{{ metrics.totals.na }}</div>
   </div>
 </div>
 
-<h2 class="text-lg font-semibold mb-3">Recent Scans</h2>
+{% if metrics.has_data %}
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-8">
+  <div class="xl:col-span-3 rounded-xl border border-slate-800 bg-slate-900/60 p-5 flex flex-col">
+    <h2 class="text-sm font-semibold text-slate-300 mb-1">Compliance gauge</h2>
+    <p class="text-xs text-slate-500 mb-3">Not-a-finding rate across reviewed controls (excludes NA)</p>
+    <div class="relative flex-1 min-h-[10rem]">
+      <canvas id="dashboard-compliance-gauge"></canvas>
+      <div class="absolute inset-x-0 bottom-6 text-center pointer-events-none">
+        <div id="dashboard-compliance-value" class="text-3xl font-bold text-emerald-400">—</div>
+        <div class="text-xs text-slate-500">NF / (Open + NR + NF)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="xl:col-span-4 rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+    <h2 class="text-sm font-semibold text-slate-300 mb-1">Overall control status</h2>
+    <p class="text-xs text-slate-500 mb-3">Totals from the latest completed scan per target</p>
+    <div class="h-64">
+      <canvas id="dashboard-status-chart"></canvas>
+    </div>
+    <div class="mt-3 flex flex-wrap gap-3 text-xs">
+      <span class="text-emerald-400">{{ metrics.totals.nf }} not a finding</span>
+      <span class="text-red-400">{{ metrics.totals.open }} open</span>
+      <span class="text-amber-400">{{ metrics.totals.nr }} not reviewed</span>
+      <span class="text-slate-400">{{ metrics.totals.na }} not applicable</span>
+    </div>
+  </div>
+
+  <div class="xl:col-span-5 rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+    <h2 class="text-sm font-semibold text-slate-300 mb-1">Totals by STIG checklist</h2>
+    <p class="text-xs text-slate-500 mb-3">Stacked counts per STIG Readiness Guide</p>
+    <div class="h-64">
+      <canvas id="dashboard-checklist-chart"></canvas>
+    </div>
+  </div>
+</div>
+
+{% if metrics.checklists %}
+<div class="rounded-xl border border-slate-800 overflow-hidden mb-8">
+  <div class="px-4 py-3 border-b border-slate-800 bg-slate-900/80">
+    <h2 class="text-sm font-semibold text-slate-300">Checklist breakdown</h2>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-900 text-slate-400">
+        <tr>
+          <th class="text-left p-3 min-w-[18rem]">STIG Readiness Guide</th>
+          <th class="text-right p-3">Targets</th>
+          <th class="text-right p-3 text-red-300">Open</th>
+          <th class="text-right p-3 text-amber-300">NR</th>
+          <th class="text-right p-3 text-slate-300">NA</th>
+          <th class="text-right p-3 text-emerald-300">NF</th>
+          <th class="text-right p-3">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in metrics.checklists %}
+        <tr class="border-t border-slate-800 hover:bg-slate-900/50">
+          <td class="p-3">{{ row.title }}</td>
+          <td class="p-3 text-right text-slate-400">{{ row.target_count }}</td>
+          <td class="p-3 text-right text-red-400">{{ row.counts.open }}</td>
+          <td class="p-3 text-right text-amber-400">{{ row.counts.nr }}</td>
+          <td class="p-3 text-right text-slate-400">{{ row.counts.na }}</td>
+          <td class="p-3 text-right text-emerald-400">{{ row.counts.nf }}</td>
+          <td class="p-3 text-right font-medium">{{ row.counts.total }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="rounded-xl border border-slate-800 bg-slate-900/40 p-8 mb-8 text-center text-slate-400">
+  <p class="mb-3">No completed scan results yet — run a scan to populate compliance metrics.</p>
+  {% if current_user and current_user.can_scan() %}
+  <a href="{{ url('/scans/new') }}" class="inline-block rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium text-white">Run New Scan</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+  <h2 class="text-lg font-semibold">Recent Scans</h2>
+  {% if current_user and current_user.can_scan() %}
+  <a href="{{ url('/scans/new') }}" class="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium">Run New Scan</a>
+  {% endif %}
+</div>
 <div class="rounded-xl border border-slate-800 overflow-hidden">
   <table class="w-full text-sm">
     <thead class="bg-slate-900 text-slate-400">
@@ -49,4 +150,14 @@
     </tbody>
   </table>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if metrics.has_data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="{{ url('/static/dashboard-charts.js') }}"></script>
+<script>
+  initDashboardCharts({{ metrics_json|tojson }});
+</script>
+{% endif %}
 {% endblock %}

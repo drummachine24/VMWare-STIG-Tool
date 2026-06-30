@@ -21,6 +21,7 @@ from app.models import ScanJob, ScanResult, ScanSchedule, VCenterConnection
 from app.services.app_secret import ensure_app_secret_key, resolve_app_secret_key
 from app.services.credential_key import sync_credential_key_file_from_env
 from app.services.crypto import encrypt_secret
+from app.services.dashboard_metrics import get_dashboard_metrics, metrics_as_dict
 from app.services.preflight import run_preflight
 from app.services.scan_rescan import rescan_job
 from app.tasks.celery_app import run_scan_job
@@ -109,6 +110,7 @@ def dashboard(
     )
     vcenters = db.query(VCenterConnection).count()
     schedules = db.query(ScanSchedule).filter(ScanSchedule.enabled.is_(True)).count()
+    metrics = get_dashboard_metrics(db)
     return render(
         request,
         "dashboard.html",
@@ -116,6 +118,8 @@ def dashboard(
             "recent_jobs": recent_jobs,
             "vcenter_count": vcenters,
             "schedule_count": schedules,
+            "metrics": metrics,
+            "metrics_json": metrics_as_dict(metrics),
         },
     )
 
