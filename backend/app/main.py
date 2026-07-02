@@ -2,8 +2,9 @@ from pathlib import Path
 
 import logging
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -23,9 +24,20 @@ from app.services.credential_key import sync_credential_key_file_from_env
 from app.services.crypto import encrypt_secret
 from app.services.dashboard_metrics import get_dashboard_metrics, metrics_as_dict
 from app.services.preflight import run_preflight
+from app.services.scan_delete import (
+    count_deletable_scan_jobs,
+    delete_all_deletable_scan_jobs,
+    delete_scan_job,
+)
 from app.services.scan_rescan import rescan_job
 from app.tasks.celery_app import run_scan_job
-from app.web import render, url_for_path
+from app.web import (
+    DEFAULT_SCANS_PER_PAGE,
+    SCANS_PER_PAGE_OPTIONS,
+    render,
+    scans_list_url,
+    url_for_path,
+)
 
 try:
     ensure_app_secret_key()
@@ -175,18 +187,54 @@ def preflight_page(
 @app.get("/scans", response_class=HTMLResponse)
 def scans_page(
     request: Request,
+    page: int = Query(1, ge=1),
+    per_page: str = Query(DEFAULT_SCANS_PER_PAGE),
     db: Session = Depends(get_db),
     _user=Depends(require_viewer),
 ):
-    jobs = (
+    if per_page not in SCANS_PER_PAGE_OPTIONS:
+        per_page = DEFAULT_SCANS_PER_PAGE
+
+    root_path = get_settings().app_root_path or ""
+    total = db.query(func.count(ScanJob.id)).scalar() or 0
+    base_query = (
         db.query(ScanJob)
         .options(joinedload(ScanJob.vcenter))
         .order_by(ScanJob.created_at.desc())
-        .limit(50)
-        .all()
     )
+
+    if per_page == "all":
+        jobs = base_query.all()
+        total_pages = 1
+        page = 1
+        offset = 0
+    else:
+        per_page_int = int(per_page)
+        total_pages = max(1, (total + per_page_int - 1) // per_page_int) if total else 1
+        page = min(page, total_pages)
+        offset = (page - 1) * per_page_int
+        jobs = base_query.offset(offset).limit(per_page_int).all()
+
     vcenters = db.query(VCenterConnection).order_by(VCenterConnection.name).all()
-    return render(request, "scans.html", {"jobs": jobs, "vcenters": vcenters})
+    return render(
+        request,
+        "scans.html",
+        {
+            "jobs": jobs,
+            "vcenters": vcenters,
+            "deletable_count": count_deletable_scan_jobs(db),
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "total_pages": total_pages,
+                "start": offset + 1 if total else 0,
+                "end": offset + len(jobs) if total else 0,
+                "per_page_options": SCANS_PER_PAGE_OPTIONS,
+            },
+            "scans_list_url": lambda p=1, pp=per_page: scans_list_url(p, pp, root_path),
+        },
+    )
 
 
 @app.get("/scans/new", response_class=HTMLResponse)
@@ -251,6 +299,31 @@ def rescan_scan_form(
     except ValueError:
         return _redirect(f"/scans/{job_id}")
     return _redirect(f"/scans/{job.id}")
+
+
+@app.post("/scans/delete-all")
+def delete_all_scans_form(
+    db: Session = Depends(get_db),
+    _user=Depends(require_scanner),
+):
+    delete_all_deletable_scan_jobs(db)
+    return _redirect("/scans")
+
+
+@app.post("/scans/{job_id}/delete")
+def delete_scan_form(
+    job_id: int,
+    db: Session = Depends(get_db),
+    _user=Depends(require_scanner),
+):
+    job = db.get(ScanJob, job_id)
+    if not job:
+        return _redirect("/scans")
+    try:
+        delete_scan_job(db, job)
+    except ValueError:
+        return _redirect(f"/scans/{job_id}")
+    return _redirect("/scans")
 
 
 @app.get("/scans/{job_id}", response_class=HTMLResponse)

@@ -26,6 +26,7 @@ from app.services.remediation_jobs import create_remediation_job, get_remediatio
 from app.services.remediation_engine import RemediationEngine
 from app.services.scan_progress import mark_cancelled, parse_selected_targets
 from app.services.checklist_service import build_checklist_payload, ensure_result_counts
+from app.services.scan_delete import delete_all_deletable_scan_jobs, delete_scan_job
 from app.services.scan_rescan import rescan_job
 from app.services.stig_catalog import build_stig_preview, get_stig_scan_catalog
 from app.tasks.celery_app import celery_app, run_scan_job
@@ -63,6 +64,11 @@ def preview_scan_stigs(payload: StigPreviewRequest, db: Session = Depends(get_db
 @router.get("", response_model=list[ScanJobResponse])
 def list_scans(db: Session = Depends(get_db), _user=Depends(require_viewer)):
     return db.query(ScanJob).order_by(ScanJob.created_at.desc()).limit(100).all()
+
+
+@router.delete("", status_code=200)
+def delete_all_scans(db: Session = Depends(get_db), _user=Depends(require_scanner)):
+    return delete_all_deletable_scan_jobs(db)
 
 
 @router.get("/{job_id}", response_model=ScanJobResponse)
@@ -164,6 +170,17 @@ def rescan_scan(job_id: int, db: Session = Depends(get_db), _user=Depends(requir
         raise HTTPException(status_code=404, detail="Scan job not found")
     try:
         return rescan_job(db, source)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/{job_id}", status_code=204)
+def delete_scan(job_id: int, db: Session = Depends(get_db), _user=Depends(require_scanner)):
+    job = db.get(ScanJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Scan job not found")
+    try:
+        delete_scan_job(db, job)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

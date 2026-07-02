@@ -34,6 +34,26 @@ def url_for_path(path: str, root_path: str | None = None) -> str:
     return f"{root}{path}" if root else path
 
 
+SCANS_PER_PAGE_OPTIONS = ("20", "50", "100", "all")
+DEFAULT_SCANS_PER_PAGE = "20"
+
+
+def scans_list_url(
+    page: int = 1,
+    per_page: str = DEFAULT_SCANS_PER_PAGE,
+    root_path: str | None = None,
+) -> str:
+    base = url_for_path("/scans", root_path)
+    params: list[str] = []
+    if per_page != DEFAULT_SCANS_PER_PAGE:
+        params.append(f"per_page={per_page}")
+    if page > 1:
+        params.append(f"page={page}")
+    if not params:
+        return base
+    return f"{base}?{'&'.join(params)}"
+
+
 def render(request: Request, template_name: str, context: dict | None = None):
     settings = get_settings()
     root_path = settings.app_root_path or ""

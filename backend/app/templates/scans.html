@@ -3,7 +3,19 @@
 {% block content %}
 <div class="flex items-center justify-between mb-6">
   <h1 class="text-2xl font-bold">Scan Jobs</h1>
-  <a href="{{ url('/scans/new') }}" class="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium">New Scan</a>
+  <div class="flex items-center gap-2">
+    {% if current_user and current_user.can_scan() and deletable_count > 0 %}
+    <form method="post" action="{{ url('/scans/delete-all') }}" class="inline"
+          onsubmit="return confirm('Delete all {{ deletable_count }} completed, failed, and cancelled scans? Running or pending scans will be kept. This cannot be undone.');">
+      <button type="submit" class="rounded-lg border border-red-800 text-red-300 hover:bg-red-950/40 px-4 py-2 text-sm font-medium">
+        Delete All
+      </button>
+    </form>
+    {% endif %}
+    {% if current_user and current_user.can_scan() %}
+    <a href="{{ url('/scans/new') }}" class="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium">New Scan</a>
+    {% endif %}
+  </div>
 </div>
 <div class="rounded-xl border border-slate-800 overflow-hidden" data-tour="scans-list">
   <table class="w-full text-sm">
@@ -47,6 +59,12 @@
               Rescan
             </button>
           </form>
+          <form method="post" action="{{ url('/scans/' ~ job.id ~ '/delete') }}" class="inline ml-1"
+                onsubmit="return confirm('Delete this scan and all its results? This cannot be undone.');">
+            <button type="submit" class="text-xs rounded border border-red-800 text-red-300 hover:bg-red-950/40 px-2 py-1">
+              Delete
+            </button>
+          </form>
           {% else %}
           <span class="text-slate-600 text-xs">—</span>
           {% endif %}
@@ -58,5 +76,39 @@
       {% endfor %}
     </tbody>
   </table>
+</div>
+<div class="flex flex-wrap items-center justify-between gap-4 mt-4">
+  <p class="text-sm text-slate-400">
+    {% if pagination.total %}
+    Showing {{ pagination.start }}–{{ pagination.end }} of {{ pagination.total }}
+    {% else %}
+    No scans yet
+    {% endif %}
+  </p>
+  <div class="flex items-center gap-1">
+    <span class="text-sm text-slate-400 mr-2">Per page:</span>
+    {% for opt in pagination.per_page_options %}
+    <a href="{{ scans_list_url(1, opt) }}"
+       class="px-2.5 py-1 rounded text-sm
+         {% if opt == pagination.per_page %}bg-slate-700 text-white{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">
+      {{ 'All' if opt == 'all' else opt }}
+    </a>
+    {% endfor %}
+  </div>
+  {% if pagination.total_pages > 1 %}
+  <div class="flex items-center gap-2 text-sm">
+    {% if pagination.page > 1 %}
+    <a href="{{ scans_list_url(pagination.page - 1) }}" class="rounded border border-slate-700 px-3 py-1 text-slate-300 hover:bg-slate-800">Previous</a>
+    {% else %}
+    <span class="rounded border border-slate-800 px-3 py-1 text-slate-600">Previous</span>
+    {% endif %}
+    <span class="text-slate-400">Page {{ pagination.page }} of {{ pagination.total_pages }}</span>
+    {% if pagination.page < pagination.total_pages %}
+    <a href="{{ scans_list_url(pagination.page + 1) }}" class="rounded border border-slate-700 px-3 py-1 text-slate-300 hover:bg-slate-800">Next</a>
+    {% else %}
+    <span class="rounded border border-slate-800 px-3 py-1 text-slate-600">Next</span>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
