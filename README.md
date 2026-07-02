@@ -201,10 +201,28 @@ cd ~/vmware-stig-tool   # or your clone path on RHEL
 bash scripts/rebuild-on-server.sh --prod
 ```
 
-If you see `set: pipefail: invalid option name`, the script has Windows CRLF line endings. Fix on the server:
+If you see `set: pipefail: invalid option name`, the script has Windows CRLF line endings (common when copying from Windows instead of `git pull`). Fix on the server:
 
 ```bash
-sed -i 's/\r$//' scripts/rebuild-on-server.sh scripts/*.sh worker/install-scan-tools.sh
+# Option A — strip CRLF in place, then run
+sed -i 's/\r$//' scripts/rebuild-on-server.sh
+bash scripts/rebuild-on-server.sh --prod
+
+# Option B — run without modifying the file (works even with CRLF)
+tr -d '\r' < scripts/rebuild-on-server.sh | bash -s -- --prod
+
+# Option C — use the CRLF-safe wrapper
+bash scripts/run-rebuild-on-server.sh --prod
+
+# Verify line endings (lines should end with $ only, not ^M$)
+cat -A scripts/rebuild-on-server.sh | head -20
+```
+
+Or skip the script entirely:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml build web worker scheduler
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate web worker scheduler
 ```
 
 This will:

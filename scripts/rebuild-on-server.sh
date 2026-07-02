@@ -13,6 +13,11 @@
 # Usage:
 #   bash scripts/rebuild-on-server.sh          # dev: rebuild images (bind mounts still override app code)
 #   bash scripts/rebuild-on-server.sh --prod   # prod: bake app code into image, no bind mounts
+#
+# If copied from Windows and you see "set: pipefail: invalid option name", either:
+#   sed -i 's/\r$//' scripts/rebuild-on-server.sh
+#   tr -d '\r' < scripts/rebuild-on-server.sh | bash -s -- --prod
+#   bash scripts/run-rebuild-on-server.sh --prod
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
