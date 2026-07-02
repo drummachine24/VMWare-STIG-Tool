@@ -20,7 +20,9 @@ COPY backend/requirements.txt /app/requirements.txt
 RUN pip3 install --no-cache-dir -r /app/requirements.txt
 
 COPY worker/install-scan-tools.sh /tmp/install-scan-tools.sh
-RUN chmod +x /tmp/install-scan-tools.sh && /tmp/install-scan-tools.sh
+RUN sed -i 's/\r$//' /tmp/install-scan-tools.sh \
+    && chmod +x /tmp/install-scan-tools.sh \
+    && /tmp/install-scan-tools.sh
 
 COPY backend/app /app/app
 
