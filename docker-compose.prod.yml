@@ -1,0 +1,39 @@
+# Production override: run application code from the built image instead of bind mounts.
+#
+# Usage on the RHEL Docker host:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml build web worker scheduler
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate web worker scheduler
+#
+# Or use: bash scripts/rebuild-on-server.sh
+
+services:
+  web:
+    image: vmstigtool-web:${IMAGE_TAG:-latest}
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8081"
+      - --proxy-headers
+      - --forwarded-allow-ips=*
+    volumes: !reset
+      - ./data/reports:/data/reports
+      - ./data/ckl-exports:/data/ckl-exports
+      - ./data/secrets:/data/secrets
+      - ./stig-profiles:/usr/share/stigs:ro
+      - ./certs/dod-trust-combined.pem:/etc/ssl/certs/dod-trust.pem
+
+  worker:
+    image: vmstigtool-worker:${IMAGE_TAG:-latest}
+    volumes: !reset
+      - ./data/reports:/data/reports
+      - ./data/ckl-exports:/data/ckl-exports
+      - ./data/secrets:/data/secrets
+      - ./stig-profiles:/usr/share/stigs:ro
+
+  scheduler:
+    image: vmstigtool-scheduler:${IMAGE_TAG:-latest}
+    volumes: !reset
+      - ./data/secrets:/data/secrets

@@ -1,0 +1,23 @@
+# Git and editor metadata
+.git
+.gitignore
+.cursor
+agent-transcripts
+
+# Secrets and runtime data (never bake into images)
+.env
+.env.*
+data/
+certs/
+
+# STIG profiles and CKL exports are mounted at runtime
+stig-profiles/
+
+# Docs and local scripts not needed in images
+*.md
+scripts/
+
+# Python cache
+**/__pycache__
+**/*.pyc
+**/.pytest_cache

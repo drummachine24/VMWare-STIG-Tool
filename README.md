@@ -192,6 +192,45 @@ Set `DRY_RUN=false` when ready for real scans.
 
 ---
 
+## Deploying updates on the RHEL Docker host
+
+Docker runs on the **Linux server**, not on the Windows dev workstation. After pushing code changes to Git:
+
+```bash
+cd ~/vmware-stig-tool   # or your clone path on RHEL
+bash scripts/rebuild-on-server.sh --prod
+```
+
+If you see `set: pipefail: invalid option name`, the script has Windows CRLF line endings. Fix on the server:
+
+```bash
+sed -i 's/\r$//' scripts/rebuild-on-server.sh scripts/*.sh worker/install-scan-tools.sh
+```
+
+This will:
+1. `git pull` the latest code
+2. Rebuild `web`, `worker`, and `scheduler` images (app code baked in via `COPY backend/app`)
+3. Recreate containers using `docker-compose.prod.yml` (no `./backend/app` bind mount, no uvicorn `--reload`)
+
+**What is baked into images (safe):** Python app, templates, static files, `requirements.txt`, worker scan tools installer.
+
+**What stays mounted at runtime (not baked):** `data/reports`, `data/ckl-exports`, `data/secrets`, `stig-profiles`, certs, Postgres/Redis data.
+
+For a quick dev-style deploy (bind mount still overrides app code from the host checkout):
+
+```bash
+bash scripts/rebuild-on-server.sh
+```
+
+Optional: tag a release before building:
+
+```bash
+export IMAGE_TAG=2026-07-02
+bash scripts/rebuild-on-server.sh --prod
+```
+
+---
+
 ## Quick start (legacy summary)
 
 ## Usage workflow

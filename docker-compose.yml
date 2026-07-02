@@ -33,6 +33,7 @@ services:
 
   web:
     container_name: vmstigtool-web
+    image: vmstigtool-web:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -87,6 +88,7 @@ services:
         condition: service_healthy
 
   worker:
+    image: vmstigtool-worker:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: worker/Dockerfile
@@ -111,6 +113,7 @@ services:
         condition: service_healthy
 
   scheduler:
+    image: vmstigtool-scheduler:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: backend/Dockerfile
