@@ -1,0 +1,17 @@
+# Deploy from pre-built Docker Hub images (skip local build).
+#
+# Usage:
+#   export DOCKER_IMAGE_PREFIX=yourdockerhubuser/
+#   export IMAGE_TAG=1.0.0
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hub.yml pull web worker scheduler
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hub.yml up -d
+
+services:
+  web:
+    build: !reset
+
+  worker:
+    build: !reset
+
+  scheduler:
+    build: !reset

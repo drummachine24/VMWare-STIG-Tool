@@ -8,7 +8,7 @@
 
 services:
   web:
-    image: vmstigtool-web:${IMAGE_TAG:-latest}
+    image: ${DOCKER_IMAGE_PREFIX:-}vmstigtool-web:${IMAGE_TAG:-latest}
     command:
       - uvicorn
       - app.main:app
@@ -26,7 +26,7 @@ services:
       - ./certs/dod-trust-combined.pem:/etc/ssl/certs/dod-trust.pem
 
   worker:
-    image: vmstigtool-worker:${IMAGE_TAG:-latest}
+    image: ${DOCKER_IMAGE_PREFIX:-}vmstigtool-worker:${IMAGE_TAG:-latest}
     volumes: !reset
       - ./data/reports:/data/reports
       - ./data/ckl-exports:/data/ckl-exports
@@ -34,6 +34,6 @@ services:
       - ./stig-profiles:/usr/share/stigs:ro
 
   scheduler:
-    image: vmstigtool-scheduler:${IMAGE_TAG:-latest}
+    image: ${DOCKER_IMAGE_PREFIX:-}vmstigtool-scheduler:${IMAGE_TAG:-latest}
     volumes: !reset
       - ./data/secrets:/data/secrets

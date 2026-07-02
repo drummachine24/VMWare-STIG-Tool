@@ -1,0 +1,11 @@
+# Standalone deployment: use a project-local network instead of a pre-existing external network.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.standalone.yml up -d
+#
+# For STIG Manager integration on a shared "Stigman" network, omit this file and ensure:
+#   docker network create Stigman
+
+networks:
+  Stigman:
+    external: false

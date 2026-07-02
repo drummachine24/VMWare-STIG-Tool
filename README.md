@@ -2,6 +2,8 @@
 
 Linux Docker-based STIG compliance scanner for **VMware VCF / vSphere 9.x** with a web UI, selectable scan targets (PowerCLI + optional VCSA SSH), CKL output, and scheduled scans.
 
+**Full Docker orchestration guide:** [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md)
+
 ## Architecture
 
 | Service    | Purpose                                      |
@@ -249,6 +251,63 @@ bash scripts/rebuild-on-server.sh --prod
 
 ---
 
+## Publishing images to Docker Hub
+
+Only the **three app images** are published to Docker Hub. Postgres and Redis still use public images from Docker Hub (`postgres:16-alpine`, `redis:7-alpine`).
+
+| Image | Contents |
+|-------|----------|
+| `vmstigtool-web` | FastAPI app + UI |
+| `vmstigtool-worker` | CINC Auditor, PowerCLI, SAF CLI (large — first build can take 10–20 min) |
+| `vmstigtool-scheduler` | Celery Beat scheduler |
+
+**Not in the images** (still required at runtime): `.env` secrets, `data/`, `stig-profiles/`, certs, database.
+
+### 1. Build and push (on your RHEL Docker host)
+
+```bash
+cd /path/to/VMWARE_STIG-tool
+
+# Use your real Docker Hub username
+export DOCKER_IMAGE_PREFIX=yourdockerhubuser/
+export IMAGE_TAG=1.0.0
+
+docker login
+bash scripts/publish-to-dockerhub.sh
+```
+
+Or manually:
+
+```bash
+export DOCKER_IMAGE_PREFIX=yourdockerhubuser/
+export IMAGE_TAG=1.0.0
+
+docker compose -f docker-compose.yml -f docker-compose.prod.yml build web worker scheduler
+docker compose -f docker-compose.yml -f docker-compose.prod.yml push web worker scheduler
+```
+
+Docker Hub creates the repositories on first push. For **private** repos, create them as private on [hub.docker.com](https://hub.docker.com) before pushing.
+
+### 2. Pull and run on another server
+
+Copy the project folder (compose files, `.env`, `stig-profiles/`, etc.), then:
+
+```bash
+export DOCKER_IMAGE_PREFIX=yourdockerhubuser/
+export IMAGE_TAG=1.0.0
+
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull web worker scheduler
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+You still need first-time setup on that host: `.env`, STIG profiles, `train-vmware` plugin install, vCenter config.
+
+### 3. Local-only images (no Hub prefix)
+
+Leave `DOCKER_IMAGE_PREFIX` unset to keep local names like `vmstigtool-web:latest` (current behavior).
+
+---
+
 ## Quick start (legacy summary)
 
 ## Usage workflow
@@ -297,12 +356,16 @@ Scans produce placeholder JSON/CKL without calling CINC Auditor or vCenter — u
 ## Project layout
 
 ```
-├── docker-compose.yml
-├── backend/           # FastAPI app, UI templates, Celery tasks
-├── worker/            # Scan worker Dockerfile + tool installer
-├── scripts/           # STIG profile setup
-├── stig-profiles/     # Mount point for dod-compliance-and-automation
-└── data/reports/      # Scan JSON + CKL output
+├── docker-compose.yml           # Base stack
+├── docker-compose.prod.yml      # Production overrides (no bind mounts)
+├── docker-compose.hub.yml       # Pull from Docker Hub (no build)
+├── docker-compose.standalone.yml
+├── deploy/DEPLOYMENT.md         # Full orchestration guide
+├── backend/                     # FastAPI app, UI templates, Celery tasks
+├── worker/                      # Scan worker Dockerfile + tool installer
+├── scripts/                     # Setup, rebuild, publish scripts
+├── stig-profiles/               # Mount point for dod-compliance-and-automation
+└── data/reports/                # Scan JSON + CKL output
 ```
 
 ## Troubleshooting
@@ -310,6 +373,8 @@ Scans produce placeholder JSON/CKL without calling CINC Auditor or vCenter — u
 | Issue | Check |
 |-------|-------|
 | `set: pipefail: invalid option name` | Windows CRLF line endings — run `sed -i 's/\r$//' scripts/*.sh worker/install-scan-tools.sh` on Linux |
+| Docker Hub `push access denied` | Set `DOCKER_IMAGE_PREFIX=yourusername/` before build; run `docker login` |
+| `network Stigman ... could not be found` | `docker network create Stigman` or use `docker-compose.standalone.yml` |
 | Profiles not found | Run `setup-stig-profiles.sh`, verify `VCF_PROFILE_BASE` |
 | PowerCLI connection fails | Pre-flight page, credentials, DNS from container |
 | No CKL files | SAF CLI in worker: `docker compose exec worker saf --version` |
